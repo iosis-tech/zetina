@@ -1,0 +1,19 @@
+[profile.release]
+overflow-checks = true
+
+[workspace]
+resolver = "2"
+members = [ "crates/delegator", "crates/executor", "crates/peer" ]
+exclude = []
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/iosis-tech/sharp-p2p"
+license-file = "LICENSE"
+
+[workspace.dependencies]
+tokio = { version = "1.36", features = ["full"] }
+libp2p = { version = "0.53.2", features = [ "tokio", "gossipsub", "kad", "mdns", "noise", "macros", "tcp", "yamux", "quic"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
