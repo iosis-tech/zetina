@@ -10,4 +10,10 @@ pub enum ProverControllerError {
 
     #[error("io")]
     Io(#[from] std::io::Error),
+
+    #[error("serde")]
+    Serde(#[from] serde_json::Error),
+
+    #[error("proof parsing error")]
+    ProofParseError(String),
 }

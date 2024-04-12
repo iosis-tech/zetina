@@ -9,5 +9,5 @@ license-file.workspace = true
 
 [dependencies]
 tokio.workspace = true
-tracing.workspace = true
 tracing-subscriber.workspace = true
+tracing.workspace = true
