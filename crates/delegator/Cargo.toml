@@ -1,5 +1,5 @@
 [package]
-name = "delegator"
+name = "sharp-p2p-delegator"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
