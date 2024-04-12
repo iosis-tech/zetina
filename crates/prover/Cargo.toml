@@ -1,0 +1,16 @@
+[package]
+name = "sharp-p2p-prover"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license-file.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio.workspace = true
+tracing.workspace = true
+futures.workspace= true
+thiserror.workspace = true
+async-process.workspace = true
+sharp-p2p-common.workspace = true
