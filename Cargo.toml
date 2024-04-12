@@ -3,7 +3,7 @@ overflow-checks = true
 
 [workspace]
 resolver = "2"
-members = [ "crates/delegator", "crates/executor", "crates/peer" ]
+members = [ "crates/common", "crates/delegator", "crates/executor", "crates/peer" , "crates/prover"]
 exclude = []
 
 [workspace.package]
@@ -13,7 +13,16 @@ repository = "https://github.com/iosis-tech/sharp-p2p"
 license-file = "LICENSE"
 
 [workspace.dependencies]
+async-process = "2.2.0"
 tokio = { version = "1.36", features = ["full"] }
 libp2p = { version = "0.53.2", features = [ "tokio", "gossipsub", "kad", "mdns", "noise", "macros", "tcp", "yamux", "quic"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "1.0.58"
+futures = "0.3.30"
+hex = "0.4.3"
+
+sharp-p2p-delegator = { path = "crates/delegator" }
+sharp-p2p-executor = { path = "crates/executor" }
+sharp-p2p-prover = { path = "crates/prover" }
+sharp-p2p-common = { path = "crates/common" }
