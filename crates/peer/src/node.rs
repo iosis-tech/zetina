@@ -2,8 +2,8 @@ use libp2p::identity::Keypair;
 use libp2p::Multiaddr;
 use std::error::Error;
 use std::sync::Arc;
-use tokio::spawn;
 
+use crate::registry::RegistryHandler;
 use crate::store::Store;
 use crate::swarm::SwarmRunner;
 
@@ -44,9 +44,18 @@ pub struct Node {
 impl Node {
     pub async fn new(node_config: NodeConfig) -> Result<Self, Box<dyn Error>> {
         let mut swarm_runner = SwarmRunner::new(&node_config)?;
-        spawn(async move {
+        let registry_handler = RegistryHandler::new(
+            "https://starknet-sepolia.public.blastapi.io",
+            "0xcdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b",
+        );
+        // Node should run swarm runner and registry handler concurrently.
+        tokio::spawn(async move {
             swarm_runner.run(node_config.node_type).await;
         });
+        tokio::spawn(async move {
+            registry_handler.run().await;
+        });
+
         let store = Arc::new(node_config.store);
 
         Ok(Self { store })
