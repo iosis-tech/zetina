@@ -6,9 +6,11 @@ pub enum Network {
     Sepolia,
 }
 
-pub fn get_network_id(network: Network) -> &'static str {
-    match network {
-        Network::Mainnet => "mainnet",
-        Network::Sepolia => "sepolia",
+impl Network {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Network::Mainnet => "mainnet",
+            Network::Sepolia => "sepolia",
+        }
     }
 }

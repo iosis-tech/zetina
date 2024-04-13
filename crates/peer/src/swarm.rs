@@ -7,6 +7,7 @@ use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
 use libp2p::{mdns, noise, tcp, yamux, Multiaddr, PeerId, Swarm, SwarmBuilder};
 use tokio::io::{self, AsyncBufReadExt};
 
+use crate::network::Network;
 use crate::node::{NodeConfig, NodeType};
 
 #[derive(NetworkBehaviour)]
@@ -29,16 +30,16 @@ impl Topic {
     }
 }
 
-pub(crate) fn gossipsub_ident_topic(network: &str, topic: Topic) -> IdentTopic {
-    let network = network.trim_matches('/');
-    let topic = topic.as_str().trim_matches('/');
+pub(crate) fn gossipsub_ident_topic(network: Network, topic: Topic) -> IdentTopic {
+    let network = network.as_str();
+    let topic = topic.as_str();
     let s = format!("/{network}/{topic}");
     IdentTopic::new(s)
 }
 
 pub struct SwarmRunner {
     swarm: Swarm<PeerBehaviour>,
-    network_id: String,
+    network: Network,
 }
 
 impl SwarmRunner {
@@ -61,7 +62,7 @@ impl SwarmRunner {
         swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
-        Ok(SwarmRunner { swarm, network_id: node_config.network_id.clone() })
+        Ok(SwarmRunner { swarm, network: node_config.network })
     }
 
     pub async fn run(&mut self, node_type: NodeType) {
@@ -69,8 +70,8 @@ impl SwarmRunner {
         let mut stdin = io::BufReader::new(io::stdin()).lines();
 
         let publish_topic = match node_type {
-            NodeType::Delegator => gossipsub_ident_topic(&self.network_id, Topic::NewJob),
-            NodeType::Executor => gossipsub_ident_topic(&self.network_id, Topic::PickedJob),
+            NodeType::Delegator => gossipsub_ident_topic(self.network, Topic::NewJob),
+            NodeType::Executor => gossipsub_ident_topic(self.network, Topic::PickedJob),
         };
 
         loop {
@@ -126,9 +127,9 @@ fn init_gossip(node_config: &NodeConfig) -> Result<gossipsub::Behaviour, Box<dyn
         gossipsub::Behaviour::new(message_authenticity, config).unwrap();
 
     // `new-job` is the topic about new job to be proven
-    let new_job_topic = gossipsub_ident_topic(&node_config.network_id, Topic::NewJob);
+    let new_job_topic = gossipsub_ident_topic(node_config.network, Topic::NewJob);
     // `picked-job` is the topic about picked job to processing prover
-    let picked_job_topic = gossipsub_ident_topic(&node_config.network_id, Topic::PickedJob);
+    let picked_job_topic = gossipsub_ident_topic(node_config.network, Topic::PickedJob);
 
     match node_config.node_type {
         NodeType::Delegator => {

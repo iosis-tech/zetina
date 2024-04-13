@@ -3,6 +3,7 @@ use libp2p::Multiaddr;
 use std::error::Error;
 use std::sync::Arc;
 
+use crate::network::Network;
 use crate::registry::RegistryHandler;
 use crate::store::Store;
 use crate::swarm::SwarmRunner;
@@ -15,7 +16,7 @@ pub enum NodeType {
 pub struct NodeConfig {
     pub node_type: NodeType,
     /// An id of the network to connect to.
-    pub network_id: String,
+    pub network: Network,
     /// The keypair to be used as [`Node`]s identity.
     pub p2p_local_keypair: Keypair,
     /// List of the addresses where [`Node`] will listen for incoming connections.
@@ -27,12 +28,12 @@ pub struct NodeConfig {
 impl NodeConfig {
     pub fn new(
         node_type: NodeType,
-        network_id: String,
+        network: Network,
         p2p_local_keypair: Keypair,
         p2p_listen_on: Vec<Multiaddr>,
         store: Store,
     ) -> Self {
-        Self { node_type, network_id, p2p_local_keypair, p2p_listen_on, store }
+        Self { node_type, network, p2p_local_keypair, p2p_listen_on, store }
     }
 }
 
