@@ -1,0 +1,8 @@
+setup.py
+bootloader/__init__.py
+bootloader/recursive/__init__.py
+sharp_p2p.egg-info/PKG-INFO
+sharp_p2p.egg-info/SOURCES.txt
+sharp_p2p.egg-info/dependency_links.txt
+sharp_p2p.egg-info/not-zip-safe
+sharp_p2p.egg-info/top_level.txt
