@@ -66,10 +66,10 @@ impl SwarmRunner {
     }
 
     pub fn run(
-        mut self,
+        &mut self,
         send_topic: IdentTopic,
         mut send_topic_rx: mpsc::Receiver<Vec<u8>>,
-    ) -> Pin<Box<impl Stream<Item = gossipsub::Event>>> {
+    ) -> Pin<Box<impl Stream<Item = gossipsub::Event> + '_>> {
         let stream = stream! {
             loop {
                 tokio::select! {
@@ -105,7 +105,8 @@ impl SwarmRunner {
                             debug!("Local node is listening on {address}");
                         }
                         _ => {}
-                    }
+                    },
+                    else => break
                 }
             }
         };
