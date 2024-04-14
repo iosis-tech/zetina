@@ -7,6 +7,7 @@ use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
 use libp2p::{mdns, noise, tcp, yamux, Swarm, SwarmBuilder};
 use std::error::Error;
 use std::pin::Pin;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
@@ -25,22 +26,26 @@ pub struct SwarmRunner {
 impl SwarmRunner {
     pub fn new(
         p2p_local_keypair: &Keypair,
-        subscribe_topic: &IdentTopic,
+        subscribe_topics: &[IdentTopic],
     ) -> Result<Self, Box<dyn Error>> {
         let mdns = mdns::tokio::Behaviour::new(
             mdns::Config::default(),
             p2p_local_keypair.public().to_peer_id(),
         )?;
-        let gossipsub = Self::init_gossip(p2p_local_keypair, subscribe_topic)?;
+        let gossipsub = Self::init_gossip(p2p_local_keypair)?;
         let behaviour = PeerBehaviour { gossipsub, mdns };
         let local_keypair = p2p_local_keypair.clone();
         let mut swarm = SwarmBuilder::with_existing_identity(local_keypair)
             .with_tokio()
             .with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)?
             .with_quic()
-            .with_behaviour(|_| behaviour)
-            .expect("Moving behaviour doesn't fail")
+            .with_behaviour(|_| behaviour)?
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
+
+        for topic in subscribe_topics {
+            swarm.behaviour_mut().gossipsub.subscribe(topic)?;
+        }
 
         swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
@@ -48,23 +53,16 @@ impl SwarmRunner {
         Ok(SwarmRunner { swarm, cancellation_token: CancellationToken::new() })
     }
 
-    fn init_gossip(
-        p2p_local_keypair: &Keypair,
-        subscribe_topic: &IdentTopic,
-    ) -> Result<gossipsub::Behaviour, Box<dyn Error>> {
+    fn init_gossip(p2p_local_keypair: &Keypair) -> Result<gossipsub::Behaviour, Box<dyn Error>> {
         let message_authenticity =
             gossipsub::MessageAuthenticity::Signed(p2p_local_keypair.clone());
+
         let config = gossipsub::ConfigBuilder::default()
+            .heartbeat_interval(Duration::from_secs(10))
             .validation_mode(gossipsub::ValidationMode::Strict)
-            .validate_messages()
-            .build()
-            .unwrap();
-        let mut gossipsub: gossipsub::Behaviour =
-            gossipsub::Behaviour::new(message_authenticity, config).unwrap();
+            .build()?;
 
-        gossipsub.subscribe(subscribe_topic)?;
-
-        Ok(gossipsub)
+        Ok(gossipsub::Behaviour::new(message_authenticity, config)?)
     }
 
     pub fn run(
