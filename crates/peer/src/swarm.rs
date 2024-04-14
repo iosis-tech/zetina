@@ -8,6 +8,7 @@ use libp2p::{mdns, noise, tcp, yamux, Swarm, SwarmBuilder};
 use std::error::Error;
 use std::pin::Pin;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 
 #[derive(NetworkBehaviour)]
@@ -18,6 +19,7 @@ struct PeerBehaviour {
 
 pub struct SwarmRunner {
     swarm: Swarm<PeerBehaviour>,
+    cancellation_token: CancellationToken,
 }
 
 impl SwarmRunner {
@@ -43,7 +45,7 @@ impl SwarmRunner {
         swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
-        Ok(SwarmRunner { swarm })
+        Ok(SwarmRunner { swarm, cancellation_token: CancellationToken::new() })
     }
 
     fn init_gossip(
@@ -106,10 +108,18 @@ impl SwarmRunner {
                         }
                         _ => {}
                     },
-                    else => break
+                    _ = self.cancellation_token.cancelled() => {
+                        break
+                    }
                 }
             }
         };
         Box::pin(stream)
+    }
+}
+
+impl Drop for SwarmRunner {
+    fn drop(&mut self) {
+        self.cancellation_token.cancel();
     }
 }
