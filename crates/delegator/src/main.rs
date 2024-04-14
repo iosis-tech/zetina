@@ -1,9 +1,11 @@
-use sharp_p2p_peer::network::Network;
-use sharp_p2p_peer::node::{Node, NodeConfig, NodeType};
-use sharp_p2p_peer::store::Store;
+use futures_util::StreamExt;
+use sharp_p2p_common::network::Network;
+use sharp_p2p_common::topic::{gossipsub_ident_topic, Topic};
+use sharp_p2p_peer::registry::RegistryHandler;
+use sharp_p2p_peer::swarm::SwarmRunner;
 use std::error::Error;
-use std::time::Duration;
-use tokio::time::sleep;
+use tokio::sync::mpsc;
+use tracing::debug;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -13,19 +15,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // 1. Generate keypair for the node
     let p2p_local_keypair = libp2p::identity::Keypair::generate_ed25519();
 
-    // 2. Initiate a new node to sync with other peers
-    let store = Store::new();
-    let node_config = NodeConfig::new(
-        NodeType::Delegator,
-        Network::Sepolia,
-        p2p_local_keypair,
-        Vec::new(),
-        store,
+    // 2. Generate topic
+    let topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);
+
+    let swarm_runner = SwarmRunner::new(&p2p_local_keypair, &topic)?;
+    let mut registry_handler = RegistryHandler::new(
+        "https://starknet-sepolia.public.blastapi.io",
+        "0xcdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b",
     );
-    let node = Node::new(node_config).await.unwrap();
-    println!("node: {:?}", node);
+
+    let (_send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
+    let mut message_stream = swarm_runner.run(topic, send_topic_rx);
+    let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
     loop {
-        sleep(Duration::from_secs(1)).await;
+        tokio::select! {
+            Some(event) = message_stream.next() => {
+                debug!("{:?}", event);
+            },
+            Some(Ok(event_vec)) = event_stream.next() => {
+                debug!("{:?}", event_vec);
+            },
+        }
     }
 }

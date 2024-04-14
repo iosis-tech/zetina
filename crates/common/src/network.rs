@@ -1,8 +1,6 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Network {
-    /// Starknet mainnet.
     Mainnet,
-    /// Sepolia testnet.
     Sepolia,
 }
 

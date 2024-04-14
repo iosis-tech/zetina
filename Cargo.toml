@@ -20,22 +20,15 @@ license-file = "LICENSE"
 
 [workspace.dependencies]
 async-process = "2.2.0"
+async-stream = "0.3.5"
 cairo-felt = "0.9.1"
 cairo-proof-parser = { git = "https://github.com/Okm165/cairo-proof-parser", rev = "97a04bbee07330311b38d6f4cecfed3acb237626" }
 futures = "0.3.30"
+futures-core = "0.3.30"
+futures-util = "0.3.30"
 hex = "0.4.3"
 itertools = "0.12.1"
-libp2p = { version = "0.53.2", features = [
-    "tokio",
-    "gossipsub",
-    "kad",
-    "mdns",
-    "noise",
-    "macros",
-    "tcp",
-    "yamux",
-    "quic",
-] }
+libp2p = { version = "0.53.2", features = ["tokio","gossipsub","kad","mdns","noise","macros","tcp","yamux","quic"]}
 num-bigint = "0.4.4"
 serde = "1.0.197"
 serde_json = "1.0.115"
@@ -49,5 +42,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sharp-p2p-common = { path = "crates/common" }
 sharp-p2p-delegator = { path = "crates/delegator" }
 sharp-p2p-executor = { path = "crates/executor" }
-sharp-p2p-prover = { path = "crates/prover" }
 sharp-p2p-peer = { path = "crates/peer" }
+sharp-p2p-prover = { path = "crates/prover" }
