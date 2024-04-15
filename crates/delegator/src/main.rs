@@ -1,9 +1,12 @@
-use sharp_p2p_peer::network::Network;
-use sharp_p2p_peer::node::{Node, NodeConfig, NodeType};
-use sharp_p2p_peer::store::Store;
+use futures_util::StreamExt;
+use sharp_p2p_common::network::Network;
+use sharp_p2p_common::topic::{gossipsub_ident_topic, Topic};
+use sharp_p2p_peer::registry::RegistryHandler;
+use sharp_p2p_peer::swarm::SwarmRunner;
 use std::error::Error;
-use std::time::Duration;
-use tokio::time::sleep;
+use tokio::io::{stdin, AsyncBufReadExt, BufReader};
+use tokio::sync::mpsc;
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -13,19 +16,38 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // 1. Generate keypair for the node
     let p2p_local_keypair = libp2p::identity::Keypair::generate_ed25519();
 
-    // 2. Initiate a new node to sync with other peers
-    let store = Store::new();
-    let node_config = NodeConfig::new(
-        NodeType::Delegator,
-        Network::Sepolia,
-        p2p_local_keypair,
-        Vec::new(),
-        store,
+    // 2. Generate topic
+    let new_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);
+    let picked_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob);
+
+    let mut swarm_runner =
+        SwarmRunner::new(&p2p_local_keypair, &[new_job_topic.to_owned(), picked_job_topic])?;
+    let mut registry_handler = RegistryHandler::new(
+        "https://starknet-sepolia.public.blastapi.io",
+        "0xcdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b",
     );
-    let node = Node::new(node_config).await.unwrap();
-    println!("node: {:?}", node);
+
+    let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
+    let mut message_stream = swarm_runner.run(new_job_topic, send_topic_rx);
+    let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
+
+    // Read full lines from stdin
+    let mut stdin = BufReader::new(stdin()).lines();
 
     loop {
-        sleep(Duration::from_secs(1)).await;
+        tokio::select! {
+            Ok(Some(line)) = stdin.next_line() => {
+                send_topic_tx.send(line.as_bytes().to_vec()).await?;
+            },
+            Some(event) = message_stream.next() => {
+                info!("{:?}", event);
+            },
+            Some(Ok(event_vec)) = event_stream.next() => {
+                info!("{:?}", event_vec);
+            },
+            else => break
+        }
     }
+
+    Ok(())
 }
