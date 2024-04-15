@@ -8,7 +8,8 @@ members = [
     "crates/delegator",
     "crates/executor",
     "crates/peer",
-    "crates/prover", "crates/runner",
+    "crates/prover",
+    "crates/runner",
 ]
 exclude = []
 
@@ -21,6 +22,7 @@ license-file = "LICENSE"
 [workspace.dependencies]
 async-process = "2.2.0"
 async-stream = "0.3.5"
+bincode = "1.3"
 cairo-felt = "0.9.1"
 cairo-proof-parser = { git = "https://github.com/Okm165/cairo-proof-parser", rev = "97a04bbee07330311b38d6f4cecfed3acb237626" }
 futures = "0.3.30"
@@ -28,7 +30,18 @@ futures-core = "0.3.30"
 futures-util = "0.3.30"
 hex = "0.4.3"
 itertools = "0.12.1"
-libp2p = { version = "0.53.2", features = ["secp256k1", "tokio","gossipsub","kad","mdns","noise","macros","tcp","yamux","quic"]}
+libp2p = { version = "0.53.2", features = [
+    "secp256k1",
+    "tokio",
+    "gossipsub",
+    "kad",
+    "mdns",
+    "noise",
+    "macros",
+    "tcp",
+    "yamux",
+    "quic",
+] }
 libsecp256k1 = "0.7.1"
 num-bigint = "0.4.4"
 serde = "1.0.197"

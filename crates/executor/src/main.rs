@@ -1,4 +1,6 @@
 use futures_util::StreamExt;
+use libp2p::gossipsub::Event;
+use sharp_p2p_common::job::Job;
 use sharp_p2p_common::network::Network;
 use sharp_p2p_common::topic::{gossipsub_ident_topic, Topic};
 use sharp_p2p_peer::registry::RegistryHandler;
@@ -40,7 +42,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 send_topic_tx.send(line.as_bytes().to_vec()).await?;
             },
             Some(event) = message_stream.next() => {
-                info!("{:?}", event);
+                match event {
+                    Event::Message { message, .. } => {
+                        // Received a new-job message from the network
+                        if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::NewJob).into() {
+                            let deserialized_job = Job::deserialize_job(&message.data);
+                                info!("Received a new job: {:?}", deserialized_job);
+                        }
+                        // Received a picked-job message from the network
+                        if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {
+
+                            info!("Received a picked job: {:?}", message);
+                        }
+                    },
+                    Event::Subscribed { peer_id, topic } => {
+                        info!("{} subscribed to the topic {}", peer_id.to_string(), topic.to_string());
+                    },
+                    Event::Unsubscribed { peer_id, topic }=> {
+                        info!("{} unsubscribed to the topic {}", peer_id.to_string(), topic.to_string());
+                    },
+                    _ => {}
+                }
             },
             Some(Ok(event_vec)) = event_stream.next() => {
                 info!("{:?}", event_vec);

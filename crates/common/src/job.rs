@@ -33,3 +33,13 @@ impl Display for Job {
         write!(f, "{}", hex::encode(hash!(self).to_be_bytes()))
     }
 }
+
+impl Job {
+    pub fn serialize_job(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
+    }
+
+    pub fn deserialize_job(serialized_job: &[u8]) -> Self {
+        bincode::deserialize(serialized_job).unwrap()
+    }
+}
