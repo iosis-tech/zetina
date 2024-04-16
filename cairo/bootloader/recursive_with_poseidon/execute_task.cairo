@@ -77,7 +77,7 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
 
     let program_header = cast(program_data_ptr, ProgramHeader*);
     %{
-        from starkware.cairo.bootloaders.simple_bootloader.utils import load_program
+        from bootloader.utils import load_program
 
         # Call load_program to load the program header and code to memory.
         program_address, program_data_size = load_program(
@@ -142,12 +142,12 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
 
     call_task:
     %{
-        from starkware.cairo.bootloaders.simple_bootloader.objects import (
+        from bootloader.objects import (
             CairoPieTask,
             RunProgramTask,
             Task,
         )
-        from starkware.cairo.bootloaders.simple_bootloader.utils import (
+        from bootloader.utils import (
             load_cairo_pie,
             prepare_output_runner,
         )
@@ -197,7 +197,7 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
     local return_builtin_ptrs: BuiltinData;
     %{
         from bootloader.recursive_with_poseidon.builtins import ALL_BUILTINS
-        from starkware.cairo.bootloaders.simple_bootloader.utils import write_return_builtins
+        from bootloader.utils import write_return_builtins
 
         # Fill the values of all builtin pointers after executing the task.
         builtins = task.get_program().builtins
@@ -235,7 +235,7 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
     assert [output_ptr] = output_size;
 
     %{
-        from starkware.cairo.bootloaders.simple_bootloader.utils import get_task_fact_topology
+        from bootloader.utils import get_task_fact_topology
 
         # Add the fact topology of the current task to 'fact_topologies'.
         output_start = ids.pre_execution_builtin_ptrs.output

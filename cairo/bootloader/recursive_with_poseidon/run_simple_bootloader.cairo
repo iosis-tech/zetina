@@ -138,7 +138,7 @@ func execute_tasks{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
     }
 
     %{
-        from starkware.cairo.bootloaders.simple_bootloader.objects import Task
+        from bootloader.objects import Task
 
         # Pass current task to execute_task.
         task_id = len(simple_bootloader_input.tasks) - ids.n_tasks

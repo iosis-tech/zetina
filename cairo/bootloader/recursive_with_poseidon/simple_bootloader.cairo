@@ -14,7 +14,7 @@ func main{
     poseidon_ptr: PoseidonBuiltin*,
 }() {
     %{
-        from starkware.cairo.bootloaders.simple_bootloader.objects import SimpleBootloaderInput
+        from bootloader.objects import SimpleBootloaderInput
         simple_bootloader_input = SimpleBootloaderInput.Schema().load(program_input)
     %}
 
@@ -23,7 +23,7 @@ func main{
 
     %{
         # Dump fact topologies to a json file.
-        from starkware.cairo.bootloaders.simple_bootloader.utils import (
+        from bootloader.utils import (
             configure_fact_topologies,
             write_to_fact_topologies_file,
         )
