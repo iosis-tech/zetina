@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
 
     // 1. Generate keypair for the node
-    let p2p_local_keypair = libp2p::identity::Keypair::generate_ed25519();
+    let p2p_local_keypair = libp2p::identity::Keypair::generate_secp256k1();
 
     // 2. Generate topic
     let new_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);
