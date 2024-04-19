@@ -4,6 +4,7 @@ overflow-checks = true
 [workspace]
 resolver = "2"
 members = [
+    "crates/compiler",
     "crates/common",
     "crates/delegator",
     "crates/executor",
@@ -62,3 +63,4 @@ sharp-p2p-delegator = { path = "crates/delegator" }
 sharp-p2p-executor = { path = "crates/executor" }
 sharp-p2p-peer = { path = "crates/peer" }
 sharp-p2p-prover = { path = "crates/prover" }
+sharp-p2p-compiler = { path = "crates/compiler" }
