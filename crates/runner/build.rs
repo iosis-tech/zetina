@@ -25,9 +25,9 @@ fn main() {
     Command::new("cairo-compile")
         .arg("--cairo_path")
         .arg(&workspace_root.join(&cairo_path))
-        .arg(&workspace_root.join(&cairo_path).join(&bootloader_path))
+        .arg(&workspace_root.join(&cairo_path).join(bootloader_path))
         .arg("--output")
-        .arg(&out_dir.join(&bootloader_out_name))
+        .arg(&out_dir.join(bootloader_out_name))
         .arg("--proof_mode")
         .output()
         .expect("bootloader compile failed");

@@ -1,122 +1,107 @@
 use crate::{
     errors::RunnerControllerError,
-    traits::{Runner, RunnerController},
+    traits::RunnerController,
     types::{
-        input::{BootloaderInput, Task},
+        input::{BootloaderInput, BootloaderTask},
         layout::Layout,
     },
 };
-use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace};
+use async_process::Stdio;
+use futures::Future;
+use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace, process::Process};
 use std::{
-    collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},
+    pin::Pin,
 };
-use std::{env, io::Write, path::PathBuf};
+use std::{io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
-use tokio::process::{Child, Command};
-use tracing::{debug, trace};
+use tokio::{process::Command, select, sync::mpsc};
+use tracing::debug;
+
+#[cfg(test)]
+pub mod tests;
 
 pub struct CairoRunner {
-    tasks: HashMap<u64, Child>,
+    program_path: PathBuf,
 }
 
-impl Runner for CairoRunner {
-    fn init() -> impl RunnerController {
-        Self { tasks: HashMap::new() }
+impl CairoRunner {
+    pub fn new(program_path: PathBuf) -> Self {
+        Self { program_path }
     }
 }
 
 impl RunnerController for CairoRunner {
-    async fn run(&mut self, job: Job) -> Result<JobTrace, RunnerControllerError> {
-        let cargo_target_dir =
-            PathBuf::from(env::var("CARGO_TARGET_DIR").expect("CARGO_TARGET_DIR env not present"));
-        let bootloader_out_name = PathBuf::from(
-            env::var("BOOTLOADER_OUT_NAME").expect("BOOTLOADER_OUT_NAME env not present"),
-        );
+    type ProcessResult = Result<JobTrace, RunnerControllerError>;
+    fn run(&self, job: Job) -> Result<Process<Self::ProcessResult>, RunnerControllerError> {
+        let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
+        let future: Pin<Box<dyn Future<Output = Self::ProcessResult> + '_>> =
+            Box::pin(async move {
+                let layout: &str = Layout::RecursiveWithPoseidon.into();
 
-        let program = cargo_target_dir.join(&bootloader_out_name);
-        let layout: &str = Layout::RecursiveWithPoseidon.into();
+                let mut cairo_pie = NamedTempFile::new()?;
+                cairo_pie.write_all(&job.cairo_pie)?;
 
-        let mut cairo_pie = NamedTempFile::new()?;
-        cairo_pie.write_all(&job.cairo_pie)?;
+                let input = BootloaderInput {
+                    tasks: vec![BootloaderTask {
+                        path: cairo_pie.path().to_path_buf(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                };
 
-        let input = BootloaderInput {
-            tasks: vec![Task { path: cairo_pie.path().to_path_buf(), ..Default::default() }],
-            ..Default::default()
-        };
+                let mut program_input = NamedTempFile::new()?;
+                program_input.write_all(&serde_json::to_string(&input)?.into_bytes())?;
 
-        let mut program_input = NamedTempFile::new()?;
-        program_input.write_all(&serde_json::to_string(&input)?.into_bytes())?;
+                // outputs
+                let air_public_input = NamedTempFile::new()?;
+                let air_private_input = NamedTempFile::new()?;
+                let trace = NamedTempFile::new()?;
+                let memory = NamedTempFile::new()?;
 
-        // outputs
-        let air_public_input = NamedTempFile::new()?;
-        let air_private_input = NamedTempFile::new()?;
-        let trace = NamedTempFile::new()?;
-        let memory = NamedTempFile::new()?;
+                let mut task = Command::new("cairo-run")
+                    .arg("--program")
+                    .arg(self.program_path.as_path())
+                    .arg("--layout")
+                    .arg(layout)
+                    .arg("--program_input")
+                    .arg(program_input.path())
+                    .arg("--air_public_input")
+                    .arg(air_public_input.path())
+                    .arg("--air_private_input")
+                    .arg(air_private_input.path())
+                    .arg("--trace_file")
+                    .arg(trace.path())
+                    .arg("--memory_file")
+                    .arg(memory.path())
+                    .arg("--proof_mode")
+                    .arg("--print_output")
+                    .stdout(Stdio::null())
+                    .spawn()?;
 
-        let task = Command::new("cairo-run")
-            .arg("--program")
-            .arg(program.as_path())
-            .arg("--layout")
-            .arg(layout)
-            .arg("--program_input")
-            .arg(program_input.path())
-            .arg("--air_public_input")
-            .arg(air_public_input.path())
-            .arg("--air_private_input")
-            .arg(air_private_input.path())
-            .arg("--trace_file")
-            .arg(trace.path())
-            .arg("--memory_file")
-            .arg(memory.path())
-            .arg("--proof_mode")
-            .arg("--print_output")
-            .spawn()?;
+                let job_hash = hash!(job);
 
-        let job_hash = hash!(job);
+                debug!("task {} spawned", job_hash);
 
-        debug!("task {} spawned", job_hash);
-        self.tasks.insert(job_hash.to_owned(), task);
+                loop {
+                    select! {
+                        output = task.wait() => {
+                            debug!("{:?}", output);
+                            if !output?.success() {
+                                return Err(RunnerControllerError::TaskTerminated);
+                            }
+                            let output = task.wait_with_output().await?;
+                            debug!("{:?}", output);
+                            break;
+                        }
+                        Some(()) = terminate_rx.recv() => {
+                            task.start_kill()?;
+                        }
+                    }
+                }
+                Ok(JobTrace { air_public_input, air_private_input, memory, trace })
+            });
 
-        let task_status = self
-            .tasks
-            .get_mut(&job_hash)
-            .ok_or(RunnerControllerError::TaskNotFound)?
-            .wait()
-            .await?;
-
-        trace!("task {} woke up", job_hash);
-        if !task_status.success() {
-            debug!("task terminated {}", job_hash);
-            return Err(RunnerControllerError::TaskTerminated);
-        }
-
-        let task_output = self
-            .tasks
-            .remove(&job_hash)
-            .ok_or(RunnerControllerError::TaskNotFound)?
-            .wait_with_output()
-            .await?;
-        trace!("task {} output {:?}", job_hash, task_output);
-
-        Ok(JobTrace { air_public_input, air_private_input, memory, trace })
-    }
-
-    fn terminate(&mut self, job_hash: u64) -> Result<(), RunnerControllerError> {
-        self.tasks.get_mut(&job_hash).ok_or(RunnerControllerError::TaskNotFound)?.start_kill()?;
-        trace!("task scheduled for termination {}", job_hash);
-        Ok(())
-    }
-
-    fn drop(mut self) -> Result<(), RunnerControllerError> {
-        let keys: Vec<u64> = self.tasks.keys().cloned().collect();
-        for job_hash in keys.iter() {
-            self.tasks
-                .get_mut(job_hash)
-                .ok_or(RunnerControllerError::TaskNotFound)?
-                .start_kill()?;
-            trace!("task scheduled for termination {}", job_hash);
-        }
-        Ok(())
+        Ok(Process::new(future, terminate_tx))
     }
 }
