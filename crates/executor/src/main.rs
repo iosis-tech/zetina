@@ -46,8 +46,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     Event::Message { message, .. } => {
                         // Received a new-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::NewJob).into() {
-                            let deserialized_job = Job::deserialize_job(&message.data);
-                                info!("Received a new job: {:?}", deserialized_job);
+
+                                info!("Received a new job: {:?}", message);
                         }
                         // Received a picked-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {

@@ -39,16 +39,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::select! {
             Ok(Some(_)) = stdin.next_line() => {
                 // TODO: Turn this into a real job generation
-                let job = Job {
-                    reward: 100,
-                    num_of_steps: 10,
-                    private_input: vec![1, 2, 3],
-                    public_input: vec![4, 5, 6],
-                    cpu_air_prover_config: vec![7, 8, 9],
-                    cpu_air_params: vec![10, 11, 12],
-                };
-                let serialized_job = (job).serialize_job();
-                send_topic_tx.send(serialized_job).await?;
+
+                send_topic_tx.send([1,2, 3].to_vec()).await?;
             },
             Some(event) = message_stream.next() => {
                 info!("{:?}", event);
