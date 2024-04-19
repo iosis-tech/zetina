@@ -1,0 +1,3 @@
+aiofiles==23.2.1
+cairo-lang==0.13.1
+colorama==0.4.6

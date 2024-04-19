@@ -36,8 +36,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     loop {
         tokio::select! {
-            Ok(Some(line)) = stdin.next_line() => {
-                send_topic_tx.send(line.as_bytes().to_vec()).await?;
+            Ok(Some(_)) = stdin.next_line() => {
+                // TODO: Turn this into a real job generation
+
+                send_topic_tx.send([1,2, 3].to_vec()).await?;
             },
             Some(event) = message_stream.next() => {
                 info!("{:?}", event);

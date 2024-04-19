@@ -17,7 +17,7 @@ pub struct BootloaderInput {
 
 impl Default for Task {
     fn default() -> Self {
-        Self { type_: "CairoPiePath".to_string(), path: PathBuf::default(), use_poseidon: false }
+        Self { type_: "CairoPiePath".to_string(), path: PathBuf::default(), use_poseidon: true }
     }
 }
 
