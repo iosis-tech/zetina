@@ -1,18 +1,20 @@
-use std::{collections::HashMap, io::Read};
-
 use crate::{
     errors::ProverControllerError,
     traits::{Prover, ProverController},
 };
 use itertools::{chain, Itertools};
-use sharp_p2p_common::{job::Job, job_witness::JobWitness, vec252::VecFelt252};
-use std::io::Write;
+use sharp_p2p_common::{hash, job_trace::JobTrace, job_witness::JobWitness, vec252::VecFelt252};
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+    io::Read,
+};
 use tempfile::NamedTempFile;
 use tokio::process::{Child, Command};
 use tracing::{debug, trace};
 
 pub struct StoneProver {
-    tasks: HashMap<Job, Child>,
+    tasks: HashMap<u64, Child>,
 }
 
 impl Prover for StoneProver {
@@ -22,47 +24,52 @@ impl Prover for StoneProver {
 }
 
 impl ProverController for StoneProver {
-    async fn prove(&mut self, job: Job) -> Result<JobWitness, ProverControllerError> {
+    async fn prove(&mut self, job_trace: JobTrace) -> Result<JobWitness, ProverControllerError> {
         let mut out_file = NamedTempFile::new()?;
-        let mut private_input_file = NamedTempFile::new()?;
-        let mut public_input_file = NamedTempFile::new()?;
-        let mut prover_config_file = NamedTempFile::new()?;
-        let mut parameter_file = NamedTempFile::new()?;
-
-        private_input_file.write_all(&job.private_input)?;
-        public_input_file.write_all(&job.public_input)?;
-        prover_config_file.write_all(&job.cpu_air_prover_config)?;
-        parameter_file.write_all(&job.cpu_air_params)?;
-        trace!("task {} environment prepared", job);
 
         let task = Command::new("cpu_air_prover")
-            .args(["out_file", out_file.path().to_string_lossy().as_ref()])
-            .args(["private_input_file", private_input_file.path().to_string_lossy().as_ref()])
-            .args(["public_input_file", public_input_file.path().to_string_lossy().as_ref()])
-            .args(["prover_config_file", prover_config_file.path().to_string_lossy().as_ref()])
-            .args(["parameter_file", parameter_file.path().to_string_lossy().as_ref()])
+            .args(["--out_file", out_file.path().to_string_lossy().as_ref()])
+            .args([
+                "--air_private_input",
+                job_trace.air_private_input.path().to_string_lossy().as_ref(),
+            ])
+            .args([
+                "--air_public_input",
+                job_trace.air_public_input.path().to_string_lossy().as_ref(),
+            ])
+            .args([
+                "--cpu_air_prover_config",
+                job_trace.cpu_air_prover_config.path().to_string_lossy().as_ref(),
+            ])
+            .args(["--cpu_air_params", job_trace.cpu_air_params.path().to_string_lossy().as_ref()])
             .arg("--generate_annotations")
             .spawn()?;
 
-        debug!("task {} spawned", job);
-        self.tasks.insert(job.to_owned(), task);
+        let job_trace_hash = hash!(job_trace);
 
-        let task_status =
-            self.tasks.get_mut(&job).ok_or(ProverControllerError::TaskNotFound)?.wait().await?;
+        debug!("task {} spawned", job_trace_hash);
+        self.tasks.insert(job_trace_hash.to_owned(), task);
 
-        trace!("task {} woke up", job);
+        let task_status = self
+            .tasks
+            .get_mut(&job_trace_hash)
+            .ok_or(ProverControllerError::TaskNotFound)?
+            .wait()
+            .await?;
+
+        trace!("task {} woke up", job_trace_hash);
         if !task_status.success() {
-            debug!("task terminated {}", job);
+            debug!("task terminated {}", job_trace_hash);
             return Err(ProverControllerError::TaskTerminated);
         }
 
         let task_output = self
             .tasks
-            .remove(&job)
+            .remove(&job_trace_hash)
             .ok_or(ProverControllerError::TaskNotFound)?
             .wait_with_output()
             .await?;
-        trace!("task {} output {:?}", job, task_output);
+        trace!("task {} output {:?}", job_trace_hash, task_output);
 
         let mut input = String::new();
         out_file.read_to_string(&mut input)?;
@@ -88,16 +95,23 @@ impl ProverController for StoneProver {
         Ok(JobWitness { data })
     }
 
-    async fn terminate(&mut self, job: &Job) -> Result<(), ProverControllerError> {
-        self.tasks.get_mut(job).ok_or(ProverControllerError::TaskNotFound)?.start_kill()?;
-        trace!("task scheduled for termination {}", job);
+    async fn terminate(&mut self, job_trace_hash: u64) -> Result<(), ProverControllerError> {
+        self.tasks
+            .get_mut(&job_trace_hash)
+            .ok_or(ProverControllerError::TaskNotFound)?
+            .start_kill()?;
+        trace!("task scheduled for termination {}", job_trace_hash);
         Ok(())
     }
 
     async fn drop(mut self) -> Result<(), ProverControllerError> {
-        let keys: Vec<Job> = self.tasks.keys().cloned().collect();
-        for job in keys.iter() {
-            self.terminate(job).await?;
+        let keys: Vec<u64> = self.tasks.keys().cloned().collect();
+        for job_trace_hash in keys.iter() {
+            self.tasks
+                .get_mut(job_trace_hash)
+                .ok_or(ProverControllerError::TaskNotFound)?
+                .start_kill()?;
+            trace!("task scheduled for termination {}", job_trace_hash);
         }
         Ok(())
     }
