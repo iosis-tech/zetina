@@ -31,20 +31,16 @@ impl ProverController for StoneProver {
         let cpu_air_params = NamedTempFile::new()?; // TODO implement default config and getting info from integrity verifier
 
         let task = Command::new("cpu_air_prover")
-            .args(["--out_file", out_file.path().to_string_lossy().as_ref()])
-            .args([
-                "--air_private_input",
-                job_trace.air_private_input.path().to_string_lossy().as_ref(),
-            ])
-            .args([
-                "--air_public_input",
-                job_trace.air_public_input.path().to_string_lossy().as_ref(),
-            ])
-            .args([
-                "--cpu_air_prover_config",
-                cpu_air_prover_config.path().to_string_lossy().as_ref(),
-            ])
-            .args(["--cpu_air_params", cpu_air_params.path().to_string_lossy().as_ref()])
+            .arg("--out_file")
+            .arg(out_file.path())
+            .arg("--air_private_input")
+            .arg(job_trace.air_private_input.path())
+            .arg("--air_public_input")
+            .arg(job_trace.air_public_input.path())
+            .arg("--cpu_air_prover_config")
+            .arg(cpu_air_prover_config.path())
+            .arg("--cpu_air_params")
+            .arg(cpu_air_params.path())
             .arg("--generate_annotations")
             .spawn()?;
 

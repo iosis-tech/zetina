@@ -7,11 +7,11 @@ use crate::{
     },
 };
 use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace};
-use std::io::Write;
 use std::{
     collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},
 };
+use std::{env, io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
 use tokio::process::{Child, Command};
 use tracing::{debug, trace};
@@ -28,7 +28,13 @@ impl Runner for CairoRunner {
 
 impl RunnerController for CairoRunner {
     async fn run(&mut self, job: Job) -> Result<JobTrace, RunnerControllerError> {
-        let program = NamedTempFile::new()?;
+        let cargo_target_dir =
+            PathBuf::from(env::var("CARGO_TARGET_DIR").expect("CARGO_TARGET_DIR env not present"));
+        let bootloader_out_name = PathBuf::from(
+            env::var("BOOTLOADER_OUT_NAME").expect("BOOTLOADER_OUT_NAME env not present"),
+        );
+
+        let program = cargo_target_dir.join(&bootloader_out_name);
         let layout: &str = Layout::RecursiveWithPoseidon.into();
 
         let mut cairo_pie = NamedTempFile::new()?;
@@ -49,13 +55,20 @@ impl RunnerController for CairoRunner {
         let memory = NamedTempFile::new()?;
 
         let task = Command::new("cairo-run")
-            .args(["--program", program.path().to_string_lossy().as_ref()])
-            .args(["--layout", layout])
-            .args(["--program_input", program_input.path().to_string_lossy().as_ref()])
-            .args(["--air_public_input", air_public_input.path().to_string_lossy().as_ref()])
-            .args(["--air_private_input", air_private_input.path().to_string_lossy().as_ref()])
-            .args(["--trace_file", trace.path().to_string_lossy().as_ref()])
-            .args(["--memory_file", memory.path().to_string_lossy().as_ref()])
+            .arg("--program")
+            .arg(program.as_path())
+            .arg("--layout")
+            .arg(layout)
+            .arg("--program_input")
+            .arg(program_input.path())
+            .arg("--air_public_input")
+            .arg(air_public_input.path())
+            .arg("--air_private_input")
+            .arg(air_private_input.path())
+            .arg("--trace_file")
+            .arg(trace.path())
+            .arg("--memory_file")
+            .arg(memory.path())
             .arg("--proof_mode")
             .arg("--print_output")
             .spawn()?;
