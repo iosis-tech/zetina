@@ -27,6 +27,9 @@ impl ProverController for StoneProver {
     async fn prove(&mut self, job_trace: JobTrace) -> Result<JobWitness, ProverControllerError> {
         let mut out_file = NamedTempFile::new()?;
 
+        let cpu_air_prover_config = NamedTempFile::new()?; // TODO implement default config and getting info from integrity verifier
+        let cpu_air_params = NamedTempFile::new()?; // TODO implement default config and getting info from integrity verifier
+
         let task = Command::new("cpu_air_prover")
             .args(["--out_file", out_file.path().to_string_lossy().as_ref()])
             .args([
@@ -39,9 +42,9 @@ impl ProverController for StoneProver {
             ])
             .args([
                 "--cpu_air_prover_config",
-                job_trace.cpu_air_prover_config.path().to_string_lossy().as_ref(),
+                cpu_air_prover_config.path().to_string_lossy().as_ref(),
             ])
-            .args(["--cpu_air_params", job_trace.cpu_air_params.path().to_string_lossy().as_ref()])
+            .args(["--cpu_air_params", cpu_air_params.path().to_string_lossy().as_ref()])
             .arg("--generate_annotations")
             .spawn()?;
 

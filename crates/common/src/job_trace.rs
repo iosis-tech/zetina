@@ -5,14 +5,18 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
+/*
+    Job Trace Object
+    This object represents the output from the Cairo run process in proof mode.
+    It includes objects such as public input, private input, trace, and memory.
+*/
+
 #[derive(Debug)]
 pub struct JobTrace {
-    pub air_public_input: NamedTempFile,
-    pub air_private_input: NamedTempFile,
-    pub memory: NamedTempFile, // this is not used directly but needs to live for air_private_input to be valid
-    pub trace: NamedTempFile, // this is not used directly but needs to live for air_private_input to be valid
-    pub cpu_air_prover_config: NamedTempFile,
-    pub cpu_air_params: NamedTempFile,
+    pub air_public_input: NamedTempFile, // Temporary file containing the public input
+    pub air_private_input: NamedTempFile, // Temporary file containing the private input; memory and trace files must exist for this to be valid
+    pub memory: NamedTempFile, // Temporary file containing memory data (required for air_private_input validity)
+    pub trace: NamedTempFile, // Temporary file containing trace data (required for air_private_input validity)
 }
 
 impl Hash for JobTrace {
@@ -21,8 +25,6 @@ impl Hash for JobTrace {
         self.air_private_input.path().hash(state);
         self.memory.path().hash(state);
         self.trace.path().hash(state);
-        self.cpu_air_prover_config.path().hash(state);
-        self.cpu_air_params.path().hash(state);
     }
 }
 

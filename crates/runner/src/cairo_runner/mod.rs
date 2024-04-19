@@ -86,19 +86,7 @@ impl RunnerController for CairoRunner {
             .await?;
         trace!("task {} output {:?}", job_hash, task_output);
 
-        let mut cpu_air_params = NamedTempFile::new()?;
-        let mut cpu_air_prover_config = NamedTempFile::new()?;
-        cpu_air_params.write_all(&job.cpu_air_params)?;
-        cpu_air_prover_config.write_all(&job.cpu_air_prover_config)?;
-
-        Ok(JobTrace {
-            air_public_input,
-            air_private_input,
-            memory,
-            trace,
-            cpu_air_prover_config,
-            cpu_air_params,
-        })
+        Ok(JobTrace { air_public_input, air_private_input, memory, trace })
     }
 
     fn terminate(&mut self, job_hash: u64) -> Result<(), RunnerControllerError> {
