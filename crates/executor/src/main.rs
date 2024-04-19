@@ -1,6 +1,5 @@
 use futures_util::StreamExt;
 use libp2p::gossipsub::Event;
-use sharp_p2p_common::job::Job;
 use sharp_p2p_common::network::Network;
 use sharp_p2p_common::topic::{gossipsub_ident_topic, Topic};
 use sharp_p2p_peer::registry::RegistryHandler;

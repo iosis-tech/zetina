@@ -29,7 +29,7 @@ impl Runner for CairoRunner {
 impl RunnerController for CairoRunner {
     async fn run(&mut self, job: Job) -> Result<JobTrace, RunnerControllerError> {
         let program = NamedTempFile::new()?;
-        let layout: &str = Layout::Recursive.into();
+        let layout: &str = Layout::RecursiveWithPoseidon.into();
 
         let mut cairo_pie = NamedTempFile::new()?;
         cairo_pie.write_all(&job.cairo_pie)?;
@@ -101,13 +101,13 @@ impl RunnerController for CairoRunner {
         })
     }
 
-    async fn terminate(&mut self, job_hash: u64) -> Result<(), RunnerControllerError> {
+    fn terminate(&mut self, job_hash: u64) -> Result<(), RunnerControllerError> {
         self.tasks.get_mut(&job_hash).ok_or(RunnerControllerError::TaskNotFound)?.start_kill()?;
         trace!("task scheduled for termination {}", job_hash);
         Ok(())
     }
 
-    async fn drop(mut self) -> Result<(), RunnerControllerError> {
+    fn drop(mut self) -> Result<(), RunnerControllerError> {
         let keys: Vec<u64> = self.tasks.keys().cloned().collect();
         for job_hash in keys.iter() {
             self.tasks

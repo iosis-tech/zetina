@@ -8,6 +8,6 @@ pub trait Runner {
 
 pub trait RunnerController {
     async fn run(&mut self, job: Job) -> Result<JobTrace, RunnerControllerError>;
-    async fn terminate(&mut self, job_hash: u64) -> Result<(), RunnerControllerError>;
-    async fn drop(self) -> Result<(), RunnerControllerError>;
+    fn terminate(&mut self, job_hash: u64) -> Result<(), RunnerControllerError>;
+    fn drop(self) -> Result<(), RunnerControllerError>;
 }

@@ -7,7 +7,7 @@ use std::{
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct JobWitness {
-    pub data: Vec<Felt252>,
+    pub proof: Vec<Felt252>,
 }
 
 impl Display for JobWitness {

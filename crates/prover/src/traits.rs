@@ -7,6 +7,6 @@ pub trait Prover {
 
 pub trait ProverController {
     async fn prove(&mut self, job_trace: JobTrace) -> Result<JobWitness, ProverControllerError>;
-    async fn terminate(&mut self, job_trace_hash: u64) -> Result<(), ProverControllerError>;
-    async fn drop(self) -> Result<(), ProverControllerError>;
+    fn terminate(&mut self, job_trace_hash: u64) -> Result<(), ProverControllerError>;
+    fn drop(self) -> Result<(), ProverControllerError>;
 }

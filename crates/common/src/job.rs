@@ -9,13 +9,16 @@ use crate::hash;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Job {
     pub reward: u32,
-    pub num_of_steps: u32,
-    pub cairo_pie: Vec<u8>,
-    pub public_key: PublicKey,
-    pub signature: Signature,
+    pub num_of_steps: u32, // executor needs to make sure that this num of steps are >= real ones if not executor can charge a fee on delegator in Registry (added in future)
+    pub cairo_pie: Vec<u8>, // zip format compressed bytes, no point in inflating it in RAM
+    pub public_key: PublicKey, // used it bootloader stage to confirm Job<->Delegator auth
+    pub signature: Signature, // used it bootloader stage to confirm Job<->Delegator auth
     // below fields not bounded by signature
-    pub cpu_air_params: Vec<u8>,        // needed for proving
-    pub cpu_air_prover_config: Vec<u8>, // needed for proving
+    // needed for proving,
+    // prover can falsify it but it is executor responsibility so that the proof passes the verifier checks,
+    // Delegator is interested only in succesfull proof verification and output of the job
+    pub cpu_air_params: Vec<u8>,        // JSON file serialized
+    pub cpu_air_prover_config: Vec<u8>, // JSON file serialized
 }
 
 impl Default for Job {
