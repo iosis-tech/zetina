@@ -20,3 +20,5 @@ Cargo.lock
 
 Scarb.lock
 .snfoundry_cache/
+
+stone-prover
