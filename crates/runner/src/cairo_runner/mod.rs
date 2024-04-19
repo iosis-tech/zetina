@@ -1,11 +1,8 @@
-use crate::{
-    errors::RunnerControllerError,
-    traits::RunnerController,
-    types::{
-        input::{BootloaderInput, BootloaderTask},
-        layout::Layout,
-    },
+use self::types::{
+    input::{BootloaderInput, BootloaderTask},
+    layout::Layout,
 };
+use crate::{errors::RunnerControllerError, traits::RunnerController};
 use async_process::Stdio;
 use futures::Future;
 use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace, process::Process};
@@ -17,6 +14,8 @@ use std::{io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
 use tokio::{process::Command, select, sync::mpsc};
 use tracing::debug;
+
+pub mod types;
 
 #[cfg(test)]
 pub mod tests;

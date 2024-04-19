@@ -1,0 +1,7 @@
+{
+    "trace_path": "./src/stone_prover/tests/cairo/trace",
+    "memory_path": "./src/stone_prover/tests/cairo/memory",
+    "pedersen": [],
+    "range_check": [],
+    "bitwise": []
+}
