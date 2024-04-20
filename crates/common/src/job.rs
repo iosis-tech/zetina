@@ -1,8 +1,10 @@
 use crate::hash;
-use libsecp256k1::{curve::Scalar, sign, PublicKey, SecretKey, Signature};
+use libsecp256k1::{curve::Scalar, sign, Message, PublicKey, SecretKey, Signature};
 use std::{
     fmt::Display,
+    fs,
     hash::{DefaultHasher, Hash, Hasher},
+    path::PathBuf,
 };
 
 /*
@@ -22,6 +24,33 @@ pub struct Job {
     pub registry_address: String, // The address of the registry contract where the delegator expects the proof to be verified
     pub public_key: PublicKey, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
     pub signature: Signature, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
+}
+
+impl Job {
+    pub fn new(
+        reward: u32,
+        num_of_steps: u32,
+        cairo_pie_file: PathBuf,
+        registry_address: &str,
+        secret_key: SecretKey,
+    ) -> Self {
+        Self {
+            reward,
+            num_of_steps,
+            cairo_pie: fs::read(cairo_pie_file).unwrap(),
+            registry_address: registry_address.to_string(),
+            public_key: PublicKey::from_secret_key(&secret_key),
+            signature: libsecp256k1::sign(
+                // TODO proper impl just mocked rn for tests
+                &Message::parse(&[
+                    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+                    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+                ]),
+                &secret_key,
+            )
+            .0,
+        }
+    }
 }
 
 impl Default for Job {

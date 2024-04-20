@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize)]
-pub struct Task {
+pub struct BootloaderTask {
     #[serde(rename = "type")]
     pub type_: String,
     pub path: PathBuf,
@@ -11,11 +11,11 @@ pub struct Task {
 
 #[derive(Serialize, Deserialize)]
 pub struct BootloaderInput {
-    pub tasks: Vec<Task>,
+    pub tasks: Vec<BootloaderTask>,
     pub single_page: bool,
 }
 
-impl Default for Task {
+impl Default for BootloaderTask {
     fn default() -> Self {
         Self { type_: "CairoPiePath".to_string(), path: PathBuf::default(), use_poseidon: true }
     }

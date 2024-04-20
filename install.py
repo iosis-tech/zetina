@@ -22,21 +22,21 @@ if __name__ == "__main__":
 
     log_and_run(["pip install cairo/"], "Install bootloader package", cwd=".")
 
-    # log_and_run(
-    #     [
-    #         "git clone https://github.com/starkware-libs/stone-prover.git",
-    #     ],
-    #     "Clone stone-prover",
-    #     cwd=".",
-    # )
+    log_and_run(
+        [
+            "git clone https://github.com/starkware-libs/stone-prover.git",
+        ],
+        "Clone stone-prover",
+        cwd=".",
+    )
 
-    # log_and_run(
-    #     [
-    #         "docker build --tag prover .",
-    #         "container_id=$(docker create prover)",
-    #         "docker cp -L ${container_id}:/bin/cpu_air_prover $HOME/.local/bin",
-    #         "docker cp -L ${container_id}:/bin/cpu_air_verifier $HOME/.local/bin",
-    #     ],
-    #     "Build & Install stone-prover",
-    #     cwd="stone-prover",
-    # )
+    log_and_run(
+        [
+            "docker build --tag prover .",
+            "container_id=$(docker create prover)",
+            "docker cp -L ${container_id}:/bin/cpu_air_prover $HOME/.local/bin",
+            "docker cp -L ${container_id}:/bin/cpu_air_verifier $HOME/.local/bin",
+        ],
+        "Build & Install stone-prover",
+        cwd="stone-prover",
+    )

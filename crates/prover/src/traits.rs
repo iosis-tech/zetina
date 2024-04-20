@@ -1,12 +1,10 @@
 use crate::errors::ProverControllerError;
-use sharp_p2p_common::{job_trace::JobTrace, job_witness::JobWitness};
-
-pub trait Prover {
-    fn init() -> impl ProverController;
-}
+use sharp_p2p_common::{job_trace::JobTrace, process::Process};
 
 pub trait ProverController {
-    async fn prove(&mut self, job_trace: JobTrace) -> Result<JobWitness, ProverControllerError>;
-    fn terminate(&mut self, job_trace_hash: u64) -> Result<(), ProverControllerError>;
-    fn drop(self) -> Result<(), ProverControllerError>;
+    type ProcessResult;
+    fn run(
+        &self,
+        job_trace: JobTrace,
+    ) -> Result<Process<Self::ProcessResult>, ProverControllerError>;
 }

@@ -1,0 +1,7 @@
+{
+    "trace_path": "../tests/cairo/trace",
+    "memory_path": "../tests/cairo/memory",
+    "pedersen": [],
+    "range_check": [],
+    "bitwise": []
+}
