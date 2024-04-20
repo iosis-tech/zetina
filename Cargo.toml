@@ -9,7 +9,7 @@ members = [
     "crates/executor",
     "crates/peer",
     "crates/prover",
-    "crates/runner",
+    "crates/runner", "crates/tests",
 ]
 exclude = []
 

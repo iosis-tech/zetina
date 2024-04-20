@@ -1,3 +1,4 @@
+use self::types::{config::Config, params::Params};
 use crate::{errors::ProverControllerError, traits::ProverController};
 use async_process::Stdio;
 use futures::Future;
@@ -7,7 +8,7 @@ use sharp_p2p_common::{
 };
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
-    io::Read,
+    io::{Read, Write},
     pin::Pin,
 };
 use tempfile::NamedTempFile;
@@ -20,13 +21,13 @@ pub mod types;
 pub mod tests;
 
 pub struct StoneProver {
-    config: NamedTempFile,
-    params: NamedTempFile,
+    cpu_air_prover_config: Config,
+    cpu_air_params: Params,
 }
 
 impl StoneProver {
-    pub fn new(config: NamedTempFile, params: NamedTempFile) -> Self {
-        Self { config, params }
+    pub fn new(cpu_air_prover_config: Config, cpu_air_params: Params) -> Self {
+        Self { cpu_air_prover_config, cpu_air_params }
     }
 }
 
@@ -41,12 +42,13 @@ impl ProverController for StoneProver {
             Box::pin(async move {
                 let mut out_file = NamedTempFile::new()?;
 
-                // let mut cpu_air_prover_config = NamedTempFile::new()?;
-                // let mut cpu_air_params = NamedTempFile::new()?;
+                let mut cpu_air_prover_config = NamedTempFile::new()?;
+                let mut cpu_air_params = NamedTempFile::new()?;
 
-                // cpu_air_prover_config
-                //     .write_all(&serde_json::to_string(&self.config)?.into_bytes())?;
-                // cpu_air_params.write_all(&serde_json::to_string(&self.params)?.into_bytes())?;
+                cpu_air_prover_config
+                    .write_all(&serde_json::to_string(&self.cpu_air_prover_config)?.into_bytes())?;
+                cpu_air_params
+                    .write_all(&serde_json::to_string(&self.cpu_air_params)?.into_bytes())?;
 
                 let mut task = Command::new("cpu_air_prover")
                     .arg("--out_file")
@@ -56,9 +58,9 @@ impl ProverController for StoneProver {
                     .arg("--public_input_file")
                     .arg(job_trace.air_public_input.path())
                     .arg("--prover_config_file")
-                    .arg(self.config.path())
+                    .arg(cpu_air_prover_config.path())
                     .arg("--parameter_file")
-                    .arg(self.params.path())
+                    .arg(cpu_air_params.path())
                     .arg("--generate_annotations")
                     .stdout(Stdio::null())
                     .spawn()?;

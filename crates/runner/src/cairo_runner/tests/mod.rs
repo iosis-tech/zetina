@@ -2,44 +2,63 @@ use super::CairoRunner;
 use crate::traits::RunnerController;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use rand::{rngs::ThreadRng, thread_rng, Rng};
+use rand::{thread_rng, Rng};
 use sharp_p2p_common::job::Job;
 use std::{env, path::PathBuf};
 
-fn random_job(cairo_pie_path: PathBuf, rng: &mut ThreadRng) -> Job {
-    Job::new(
-        rng.gen(),
-        rng.gen(),
-        cairo_pie_path,
-        hex::encode(rng.gen::<[u8; 32]>()).as_str(),
-        libsecp256k1::SecretKey::random(rng),
-    )
+pub struct TestFixture {
+    job: Job,
+    program_path: PathBuf,
+}
+
+fn fixture() -> TestFixture {
+    let mut rng = thread_rng();
+    let ws_root =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"))
+            .join("../../");
+    let cairo_pie_path = ws_root.join("crates/tests/cairo/fibonacci_pie.zip");
+    let program_path = ws_root.join("target/bootloader.json");
+
+    TestFixture {
+        job: Job::new(
+            rng.gen(),
+            rng.gen(),
+            cairo_pie_path,
+            hex::encode(rng.gen::<[u8; 32]>()).as_str(),
+            libsecp256k1::SecretKey::random(&mut rng),
+        ),
+        program_path,
+    }
 }
 
 #[tokio::test]
 async fn run_single_job() {
-    let mut rng = thread_rng();
-    let package_root =
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"));
-    let cairo_pie_path = package_root.join("src/cairo_runner/tests/cairo/fibonacci_pie.zip");
+    let fixture = fixture();
 
-    let runner = CairoRunner::new(package_root.join("../../target/bootloader.json"));
+    let runner = CairoRunner::new(fixture.program_path);
+    runner.run(fixture.job).unwrap().await.unwrap();
+}
 
-    runner.run(random_job(cairo_pie_path.to_owned(), &mut rng)).unwrap().await.unwrap();
+#[tokio::test]
+async fn abort_single_jobs() {
+    let fixture = fixture();
+
+    let runner = CairoRunner::new(fixture.program_path);
+    let job = runner.run(fixture.job).unwrap();
+    job.abort().await.unwrap();
+    job.await.unwrap_err();
 }
 
 #[tokio::test]
 async fn run_multiple_jobs() {
-    let mut rng = thread_rng();
-    let package_root =
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"));
-    let cairo_pie_path = package_root.join("src/cairo_runner/tests/cairo/fibonacci_pie.zip");
+    let fixture1 = fixture();
+    let fixture2 = fixture();
 
-    let runner = CairoRunner::new(package_root.join("../../target/bootloader.json"));
+    let runner = CairoRunner::new(fixture1.program_path);
     let mut futures = FuturesUnordered::new();
 
-    let job1 = runner.run(random_job(cairo_pie_path.to_owned(), &mut rng)).unwrap();
-    let job2 = runner.run(random_job(cairo_pie_path.to_owned(), &mut rng)).unwrap();
+    let job1 = runner.run(fixture1.job).unwrap();
+    let job2 = runner.run(fixture2.job).unwrap();
 
     futures.push(job1);
     futures.push(job2);
@@ -50,32 +69,15 @@ async fn run_multiple_jobs() {
 }
 
 #[tokio::test]
-async fn abort_single_jobs() {
-    let mut rng = thread_rng();
-    let package_root =
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"));
-    let cairo_pie_path = package_root.join("src/cairo_runner/tests/cairo/fibonacci_pie.zip");
-
-    let runner = CairoRunner::new(package_root.join("../../target/bootloader.json"));
-
-    let job = runner.run(random_job(cairo_pie_path.to_owned(), &mut rng)).unwrap();
-    job.abort().await.unwrap();
-
-    job.await.unwrap_err();
-}
-
-#[tokio::test]
 async fn abort_multiple_jobs() {
-    let mut rng = thread_rng();
-    let package_root =
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"));
-    let cairo_pie_path = package_root.join("src/cairo_runner/tests/cairo/fibonacci_pie.zip");
+    let fixture1 = fixture();
+    let fixture2 = fixture();
 
-    let runner = CairoRunner::new(package_root.join("../../target/bootloader.json"));
+    let runner = CairoRunner::new(fixture1.program_path);
     let mut futures = FuturesUnordered::new();
 
-    let job1 = runner.run(random_job(cairo_pie_path.to_owned(), &mut rng)).unwrap();
-    let job2 = runner.run(random_job(cairo_pie_path.to_owned(), &mut rng)).unwrap();
+    let job1 = runner.run(fixture1.job).unwrap();
+    let job2 = runner.run(fixture2.job).unwrap();
 
     job1.abort().await.unwrap();
     job2.abort().await.unwrap();
