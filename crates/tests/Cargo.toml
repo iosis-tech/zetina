@@ -12,3 +12,6 @@ futures.workspace = true
 sharp-p2p-prover.workspace = true
 sharp-p2p-runner.workspace = true
 tokio.workspace = true
+
+[features]
+full_test = []

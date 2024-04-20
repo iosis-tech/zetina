@@ -1,4 +1,7 @@
-use crate::stone_prover::types::{config::Config, params::Params};
+use crate::stone_prover::types::{
+    config::Config,
+    params::{Fri, Params, Stark},
+};
 use sharp_p2p_common::job_trace::JobTrace;
 use std::{env, fs, io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
@@ -18,9 +21,6 @@ pub fn fixture() -> TestFixture {
     let memory_path = ws_root.join("crates/tests/cairo/memory");
     let trace_path = ws_root.join("crates/tests/cairo/trace");
 
-    let cpu_air_prover_config_path = ws_root.join("crates/tests/cairo/cpu_air_prover_config.json");
-    let cpu_air_params_path = ws_root.join("crates/tests/cairo/cpu_air_params.json");
-
     let mut air_public_input = NamedTempFile::new().unwrap();
     air_public_input.write_all(&fs::read(air_public_input_path).unwrap()).unwrap();
 
@@ -35,11 +35,18 @@ pub fn fixture() -> TestFixture {
 
     TestFixture {
         job_trace: JobTrace { air_public_input, air_private_input, memory, trace },
-        cpu_air_prover_config: serde_json::from_str(
-            &fs::read_to_string(cpu_air_prover_config_path).unwrap(),
-        )
-        .unwrap(),
-        cpu_air_params: serde_json::from_str(&fs::read_to_string(cpu_air_params_path).unwrap())
-            .unwrap(),
+        cpu_air_prover_config: Config::default(),
+        cpu_air_params: Params {
+            stark: Stark {
+                fri: Fri {
+                    fri_step_list: vec![0, 4, 4, 3],
+                    last_layer_degree_bound: 128,
+                    n_queries: 1,
+                    proof_of_work_bits: 1,
+                },
+                log_n_cosets: 1,
+            },
+            ..Default::default()
+        },
     }
 }

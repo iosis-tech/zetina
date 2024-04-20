@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  formatting-and-testing:
+  setup:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -27,12 +27,26 @@ jobs:
       
       - name: Provision Environment
         run: python install.py
-    
+      
       - name: Format code
         run: cargo fmt --check
       
+      - name: Build
+        run: cargo build
+  
+  tests:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
       - name: Run cargo tests
         run: cargo test
     
       - name: Run snforge tests
         run: snforge test
+  
+  full_tests:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run cargo full_tests
+        run: cargo test --features full_test
