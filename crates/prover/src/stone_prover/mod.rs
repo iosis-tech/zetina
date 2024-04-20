@@ -15,10 +15,8 @@ use tempfile::NamedTempFile;
 use tokio::{process::Command, select, sync::mpsc};
 use tracing::debug;
 
-pub mod types;
-
-#[cfg(test)]
 pub mod tests;
+pub mod types;
 
 pub struct StoneProver {
     cpu_air_prover_config: Config,

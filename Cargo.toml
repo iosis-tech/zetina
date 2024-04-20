@@ -62,3 +62,5 @@ sharp-p2p-delegator = { path = "crates/delegator" }
 sharp-p2p-executor = { path = "crates/executor" }
 sharp-p2p-peer = { path = "crates/peer" }
 sharp-p2p-prover = { path = "crates/prover" }
+sharp-p2p-runner = { path = "crates/runner" }
+sharp-p2p-tests = { path = "crates/tests" }

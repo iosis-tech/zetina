@@ -1,5 +1,5 @@
 [package]
-name = "tests"
+name = "sharp-p2p-tests"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
@@ -8,3 +8,7 @@ license-file.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+futures.workspace = true
+sharp-p2p-prover.workspace = true
+sharp-p2p-runner.workspace = true
+tokio.workspace = true
