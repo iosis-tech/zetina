@@ -30,13 +30,12 @@ impl StoneProver {
 }
 
 impl ProverController for StoneProver {
-    type ProcessResult = Result<JobWitness, ProverControllerError>;
     fn run(
         &self,
         job_trace: JobTrace,
-    ) -> Result<Process<Self::ProcessResult>, ProverControllerError> {
+    ) -> Result<Process<Result<JobWitness, ProverControllerError>>, ProverControllerError> {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
-        let future: Pin<Box<dyn Future<Output = Self::ProcessResult> + '_>> =
+        let future: Pin<Box<dyn Future<Output = Result<JobWitness, ProverControllerError>> + '_>> =
             Box::pin(async move {
                 let mut out_file = NamedTempFile::new()?;
 

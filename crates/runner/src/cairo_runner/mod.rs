@@ -1,11 +1,8 @@
-use self::types::{
-    input::{BootloaderInput, BootloaderTask},
-    layout::Layout,
-};
+use self::types::input::{BootloaderInput, BootloaderTask};
 use crate::{errors::RunnerControllerError, traits::RunnerController};
 use async_process::Stdio;
 use futures::Future;
-use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace, process::Process};
+use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace, layout::Layout, process::Process};
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     pin::Pin,
@@ -29,10 +26,12 @@ impl CairoRunner {
 }
 
 impl RunnerController for CairoRunner {
-    type ProcessResult = Result<JobTrace, RunnerControllerError>;
-    fn run(&self, job: Job) -> Result<Process<Self::ProcessResult>, RunnerControllerError> {
+    fn run(
+        &self,
+        job: Job,
+    ) -> Result<Process<Result<JobTrace, RunnerControllerError>>, RunnerControllerError> {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
-        let future: Pin<Box<dyn Future<Output = Self::ProcessResult> + '_>> =
+        let future: Pin<Box<dyn Future<Output = Result<JobTrace, RunnerControllerError>> + '_>> =
             Box::pin(async move {
                 let layout: &str = Layout::RecursiveWithPoseidon.into();
 
