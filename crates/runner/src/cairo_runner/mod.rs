@@ -26,10 +26,12 @@ impl CairoRunner {
 }
 
 impl RunnerController for CairoRunner {
-    type ProcessResult = Result<JobTrace, RunnerControllerError>;
-    fn run(&self, job: Job) -> Result<Process<Self::ProcessResult>, RunnerControllerError> {
+    fn run(
+        &self,
+        job: Job,
+    ) -> Result<Process<Result<JobTrace, RunnerControllerError>>, RunnerControllerError> {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
-        let future: Pin<Box<dyn Future<Output = Self::ProcessResult> + '_>> =
+        let future: Pin<Box<dyn Future<Output = Result<JobTrace, RunnerControllerError>> + '_>> =
             Box::pin(async move {
                 let layout: &str = Layout::RecursiveWithPoseidon.into();
 

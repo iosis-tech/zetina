@@ -26,14 +26,13 @@ impl Default for CairoCompiler {
 }
 
 impl CompilerController for CairoCompiler {
-    type ProcessResult = Result<Job, CompilerControllerError>;
     fn run(
         &self,
         program_path: PathBuf,
         program_input_path: PathBuf,
-    ) -> Result<Process<Self::ProcessResult>, CompilerControllerError> {
+    ) -> Result<Process<Result<Job, CompilerControllerError>>, CompilerControllerError> {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
-        let future: Pin<Box<dyn Future<Output = Self::ProcessResult> + '_>> =
+        let future: Pin<Box<dyn Future<Output = Result<Job, CompilerControllerError>> + '_>> =
             Box::pin(async move {
                 let layout: &str = Layout::RecursiveWithPoseidon.into();
 
