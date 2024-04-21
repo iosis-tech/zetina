@@ -9,13 +9,19 @@ use tempfile::NamedTempFile;
 use tokio::{process::Command, select, sync::mpsc};
 use tracing::debug;
 
-pub struct CairoCompiler {
-    program_path: PathBuf,
-}
+pub mod tests;
+
+pub struct CairoCompiler {}
 
 impl CairoCompiler {
-    pub fn new(program_path: PathBuf) -> Self {
-        Self { program_path }
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for CairoCompiler {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -31,12 +37,41 @@ impl CompilerController for CairoCompiler {
             Box::pin(async move {
                 let layout: &str = Layout::RecursiveWithPoseidon.into();
 
+                let output = NamedTempFile::new()?;
+
+                let mut task = Command::new("cairo-compile")
+                    .arg(program_path.as_path())
+                    .arg("--output")
+                    .arg(output.path())
+                    .arg("--proof_mode")
+                    .stdout(Stdio::null())
+                    .spawn()?;
+
+                debug!("program {:?} is compiling... ", program_path);
+
+                loop {
+                    select! {
+                        output = task.wait() => {
+                            debug!("{:?}", output);
+                            if !output?.success() {
+                                return Err(CompilerControllerError::TaskTerminated);
+                            }
+                            let output = task.wait_with_output().await?;
+                            debug!("{:?}", output);
+                            break;
+                        }
+                        Some(()) = terminate_rx.recv() => {
+                            task.start_kill()?;
+                        }
+                    }
+                }
+
                 // output
                 let mut cairo_pie = NamedTempFile::new()?;
 
                 let mut task = Command::new("cairo-run")
                     .arg("--program")
-                    .arg(program_path.as_path())
+                    .arg(output.path())
                     .arg("--layout")
                     .arg(layout)
                     .arg("--program_input")
@@ -47,7 +82,7 @@ impl CompilerController for CairoCompiler {
                     .stdout(Stdio::null())
                     .spawn()?;
 
-                debug!("program {:?} is spawn", program_path);
+                debug!("program {:?} is generating PIE... ", program_path);
 
                 loop {
                     select! {
@@ -70,6 +105,7 @@ impl CompilerController for CairoCompiler {
                 let mut cairo_pie_bytes = Vec::new();
                 cairo_pie.read_to_end(&mut cairo_pie_bytes)?;
 
+                // TODO: calculate details
                 Ok(Job { cairo_pie: cairo_pie_bytes, ..Default::default() })
             });
 
