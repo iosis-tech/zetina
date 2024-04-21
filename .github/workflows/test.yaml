@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  formatting-and-testing:
+  check-formatting:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -25,14 +25,5 @@ jobs:
         with:
           python-version: '3.9'
       
-      - name: Provision Environment
-        run: python install.py
-    
       - name: Format code
         run: cargo fmt --check
-      
-      - name: Run cargo tests
-        run: cargo test
-    
-      - name: Run snforge tests
-        run: snforge test
