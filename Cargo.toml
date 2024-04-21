@@ -9,7 +9,10 @@ members = [
     "crates/executor",
     "crates/peer",
     "crates/prover",
-    "crates/runner", "crates/tests",
+    "crates/runner",
+    "crates/compiler",
+    "crates/tests",
+
 ]
 exclude = []
 
@@ -63,4 +66,5 @@ sharp-p2p-executor = { path = "crates/executor" }
 sharp-p2p-peer = { path = "crates/peer" }
 sharp-p2p-prover = { path = "crates/prover" }
 sharp-p2p-runner = { path = "crates/runner" }
+sharp-p2p-compiler = { path = "crates/compiler" }
 sharp-p2p-tests = { path = "crates/tests" }

@@ -1,11 +1,8 @@
-use self::types::{
-    input::{BootloaderInput, BootloaderTask},
-    layout::Layout,
-};
+use self::types::input::{BootloaderInput, BootloaderTask};
 use crate::{errors::RunnerControllerError, traits::RunnerController};
 use async_process::Stdio;
 use futures::Future;
-use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace, process::Process};
+use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace, layout::Layout, process::Process};
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     pin::Pin,
