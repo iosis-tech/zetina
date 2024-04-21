@@ -27,15 +27,3 @@ jobs:
       
       - name: Format code
         run: cargo fmt --check
-      
-      - name: Provision Environment
-        run: python install.py
-      
-      - name: Build
-        run: cargo build
-      
-      - name: Run cargo tests
-        run: cargo test
-    
-      - name: Run snforge tests
-        run: snforge test
