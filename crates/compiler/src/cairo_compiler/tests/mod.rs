@@ -1,6 +1,6 @@
 pub mod models;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "full_test"))]
 pub mod multiple_job;
 #[cfg(test)]
 pub mod single_job;

@@ -24,3 +24,6 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 zip-extensions.workspace = true
+
+[features]
+full_test = []

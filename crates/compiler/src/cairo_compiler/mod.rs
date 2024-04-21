@@ -106,7 +106,7 @@ impl CompilerController for CairoCompiler {
                 cairo_pie.read_to_end(&mut cairo_pie_bytes)?;
 
                 // TODO: calculate details
-                Ok(Job { cairo_pie: cairo_pie_bytes, ..Default::default() })
+                Ok(Job { cairo_pie_compressed: cairo_pie_bytes, ..Default::default() })
             });
 
         Ok(Process::new(future, terminate_tx))
