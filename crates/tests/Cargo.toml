@@ -11,4 +11,5 @@ license-file.workspace = true
 futures.workspace = true
 sharp-p2p-prover.workspace = true
 sharp-p2p-runner.workspace = true
+sharp-p2p-compiler.workspace = true
 tokio.workspace = true
