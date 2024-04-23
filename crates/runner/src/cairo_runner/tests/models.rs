@@ -1,5 +1,6 @@
 use rand::{thread_rng, Rng};
 use sharp_p2p_common::job::Job;
+use starknet::providers::sequencer::models::L1Address;
 use std::{env, path::PathBuf};
 
 pub struct TestFixture {
@@ -20,7 +21,7 @@ pub fn fixture() -> TestFixture {
             rng.gen(),
             rng.gen(),
             cairo_pie_path,
-            hex::encode(rng.gen::<[u8; 32]>()).as_str(),
+            L1Address::random(),
             libsecp256k1::SecretKey::random(&mut rng),
         ),
         program_path,

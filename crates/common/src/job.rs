@@ -1,5 +1,8 @@
 use crate::hash;
-use libsecp256k1::{curve::Scalar, sign, Message, PublicKey, SecretKey, Signature};
+use libsecp256k1::{curve::Scalar, sign, Message, PublicKey, SecretKey};
+use serde::Serialize;
+use starknet::providers::sequencer::models::L1Address;
+use starknet_crypto::{poseidon_hash_many, FieldElement};
 use std::{
     fmt::Display,
     fs,
@@ -16,14 +19,14 @@ use std::{
     The Job object also includes the target registry where the delegator expects this proof to be verified.
 */
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct Job {
     pub reward: u32,                   // The reward offered for completing the task
     pub num_of_steps: u32, // The number of steps expected to complete the task (executor ensures that this number is greater than or equal to the actual steps; in the future, the executor may charge a fee to the delegator if not met)
     pub cairo_pie_compressed: Vec<u8>, // The task bytecode in compressed zip format, to conserve memory
-    pub registry_address: String, // The address of the registry contract where the delegator expects the proof to be verified
-    pub public_key: PublicKey, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
-    pub signature: Signature, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
+    pub registry_address: Vec<u8>, // The address of the registry contract where the delegator expects the proof to be verified
+    pub public_key: Vec<u8>, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
+    pub signature: Vec<u8>, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
 }
 
 impl Job {
@@ -31,24 +34,25 @@ impl Job {
         reward: u32,
         num_of_steps: u32,
         cairo_pie_file: PathBuf,
-        registry_address: &str,
+        registry_address: L1Address,
         secret_key: SecretKey,
     ) -> Self {
+        let file = fs::read(cairo_pie_file).unwrap();
+        let mut felts: Vec<FieldElement> =
+            vec![FieldElement::from(reward), FieldElement::from(num_of_steps)];
+        felts.extend(file.chunks(31).map(|chunk| FieldElement::from_byte_slice_be(chunk).unwrap()));
+        felts.push(FieldElement::from_byte_slice_be(registry_address.as_bytes()).unwrap());
+
+        let message = Message::parse(&poseidon_hash_many(&felts).to_bytes_be());
+        let (signature, _recovery) = libsecp256k1::sign(&message, &secret_key);
+
         Self {
             reward,
             num_of_steps,
-            cairo_pie_compressed: fs::read(cairo_pie_file).unwrap(),
-            registry_address: registry_address.to_string(),
-            public_key: PublicKey::from_secret_key(&secret_key),
-            signature: libsecp256k1::sign(
-                // TODO proper impl just mocked rn for tests
-                &Message::parse(&[
-                    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-                    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-                ]),
-                &secret_key,
-            )
-            .0,
+            cairo_pie_compressed: file,
+            registry_address: registry_address.to_fixed_bytes().to_vec(),
+            public_key: PublicKey::from_secret_key(&secret_key).serialize().to_vec(),
+            signature: signature.serialize().to_vec(),
         }
     }
 }
@@ -62,10 +66,10 @@ impl Default for Job {
         Self {
             reward: 0,
             num_of_steps: 0,
-            cairo_pie_compressed: vec![1, 2, 3],
-            public_key,
-            signature,
-            registry_address: "0x0".to_string(),
+            cairo_pie_compressed: vec![],
+            registry_address: L1Address::zero().to_fixed_bytes().to_vec(),
+            public_key: public_key.serialize().to_vec(),
+            signature: signature.serialize().to_vec(),
         }
     }
 }

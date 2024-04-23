@@ -142,7 +142,8 @@ func execute_tasks{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
 
         # Pass current task to execute_task.
         task_id = len(simple_bootloader_input.tasks) - ids.n_tasks
-        task = simple_bootloader_input.tasks[task_id].load_task()
+        task_obj = simple_bootloader_input.tasks[task_id]
+        task = task_obj.load_task()
     %}
     tempvar use_poseidon = nondet %{ 1 if task.use_poseidon else 0 %};
     // Call execute_task to execute the current task.
