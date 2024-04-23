@@ -4,7 +4,7 @@ use proptest::arbitrary::any;
 use proptest::prop_compose;
 use proptest::strategy::BoxedStrategy;
 use proptest::{arbitrary::Arbitrary, strategy::Strategy};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use starknet::core::types::FromByteSliceError;
 use starknet::providers::sequencer::models::L1Address;
@@ -24,7 +24,7 @@ use std::{
 */
 
 #[serde_as]
-#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub job_data: JobData,
     #[serde_as(as = "[_; 65]")]
@@ -55,7 +55,7 @@ impl Job {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JobData {
     pub reward: u32,
     pub num_of_steps: u32,
