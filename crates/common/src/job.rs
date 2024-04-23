@@ -5,9 +5,7 @@ use starknet::providers::sequencer::models::L1Address;
 use starknet_crypto::{poseidon_hash_many, FieldElement};
 use std::{
     fmt::Display,
-    fs,
     hash::{DefaultHasher, Hash, Hasher},
-    path::PathBuf,
 };
 
 /*
@@ -33,14 +31,17 @@ impl Job {
     pub fn new(
         reward: u32,
         num_of_steps: u32,
-        cairo_pie_file: PathBuf,
+        cairo_pie_compressed: Vec<u8>,
         registry_address: L1Address,
         secret_key: SecretKey,
     ) -> Self {
-        let file = fs::read(cairo_pie_file).unwrap();
         let mut felts: Vec<FieldElement> =
             vec![FieldElement::from(reward), FieldElement::from(num_of_steps)];
-        felts.extend(file.chunks(31).map(|chunk| FieldElement::from_byte_slice_be(chunk).unwrap()));
+        felts.extend(
+            cairo_pie_compressed
+                .chunks(31)
+                .map(|chunk| FieldElement::from_byte_slice_be(chunk).unwrap()),
+        );
         felts.push(FieldElement::from_byte_slice_be(registry_address.as_bytes()).unwrap());
 
         let message = Message::parse(&poseidon_hash_many(&felts).to_bytes_be());
@@ -49,7 +50,7 @@ impl Job {
         Self {
             reward,
             num_of_steps,
-            cairo_pie_compressed: file,
+            cairo_pie_compressed,
             registry_address: registry_address.to_fixed_bytes().to_vec(),
             public_key: PublicKey::from_secret_key(&secret_key).serialize().to_vec(),
             signature: signature.serialize().to_vec(),
@@ -88,13 +89,3 @@ impl Display for Job {
         write!(f, "{}", hex::encode(hash!(self).to_be_bytes()))
     }
 }
-
-// impl Job {
-//     pub fn serialize_job(&self) -> Vec<u8> {
-//         bincode::serialize(self).unwrap()
-//     }
-
-//     pub fn deserialize_job(serialized_job: &[u8]) -> Self {
-//         bincode::deserialize(serialized_job).unwrap()
-//     }
-// }

@@ -7,3 +7,6 @@ pub mod network;
 pub mod process;
 pub mod topic;
 pub mod vec252;
+
+#[cfg(test)]
+pub mod tests;
