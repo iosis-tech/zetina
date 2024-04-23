@@ -36,7 +36,7 @@ impl RunnerController for CairoRunner {
                 let layout: &str = Layout::RecursiveWithPoseidon.into();
 
                 let mut cairo_pie = NamedTempFile::new()?;
-                cairo_pie.write_all(&job.cairo_pie_compressed)?;
+                cairo_pie.write_all(&job.job_data.cairo_pie_compressed)?;
 
                 let input = BootloaderInput {
                     tasks: vec![BootloaderTask {

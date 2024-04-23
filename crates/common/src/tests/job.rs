@@ -1,7 +1,10 @@
 use crate::job::Job;
+use proptest::prelude::*;
 
-#[test]
-fn job_serialize() {
-    let random_job = Job::default();
-    println!("{}", serde_json::to_string(&random_job).unwrap());
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1000))]
+    #[test]
+    fn job_verify_signature(job in any::<Job>()) {
+        assert!(job.verify_signature());
+    }
 }
