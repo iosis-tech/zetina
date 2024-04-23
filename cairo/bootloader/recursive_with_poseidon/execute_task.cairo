@@ -144,23 +144,17 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
     %{
         from bootloader.objects import (
             CairoPieTask,
-            RunProgramTask,
             Task,
         )
         from bootloader.utils import (
             load_cairo_pie,
-            prepare_output_runner,
         )
 
         assert isinstance(task, Task)
         n_builtins = len(task.get_program().builtins)
         new_task_locals = {}
-        if isinstance(task, RunProgramTask):
-            new_task_locals['program_input'] = task.program_input
-            new_task_locals['WITH_BOOTLOADER'] = True
-
-            vm_load_program(task.program, program_address)
-        elif isinstance(task, CairoPieTask):
+        
+        if isinstance(task, CairoPieTask):
             ret_pc = ids.ret_pc_label.instruction_offset_ - ids.call_task.instruction_offset_ + pc
             load_cairo_pie(
                 task=task.cairo_pie, memory=memory, segments=segments,
@@ -169,10 +163,6 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
         else:
             raise NotImplementedError(f'Unexpected task type: {type(task).__name__}.')
 
-        output_runner_data = prepare_output_runner(
-            task=task,
-            output_builtin=output_builtin,
-            output_ptr=ids.pre_execution_builtin_ptrs.output)
         vm_enter_scope(new_task_locals)
     %}
 
@@ -243,8 +233,6 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
         fact_topologies.append(get_task_fact_topology(
             output_size=output_end - output_start,
             task=task,
-            output_builtin=output_builtin,
-            output_runner_data=output_runner_data,
         ))
     %}
 

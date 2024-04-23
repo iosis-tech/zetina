@@ -1,5 +1,6 @@
 import subprocess
 
+from colorama import Fore, Style
 
 def log_and_run(commands, description, cwd=None):
     full_command = " && ".join(commands)

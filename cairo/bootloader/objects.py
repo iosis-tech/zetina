@@ -1,21 +1,15 @@
 import dataclasses
 from abc import abstractmethod
-from typing import Optional
-
+from typing import List, Optional
 import marshmallow_dataclass
-
 from starkware.cairo.lang.compiler.program import ProgramBase, StrippedProgram
 from starkware.cairo.lang.vm.cairo_pie import CairoPie
 from starkware.starkware_utils.validated_dataclass import ValidatedMarshmallowDataclass
 
 
 class TaskSpec(ValidatedMarshmallowDataclass):
-    """
-    Contains task's specification.
-    """
-
     @abstractmethod
-    def load_task(self, memory=None, args_start=None, args_len=None) -> "Task":
+    def load_task(self) -> "Task":
         """
         Returns the corresponding task.
         """
@@ -39,27 +33,32 @@ class CairoPieTask(Task):
 
 
 @dataclasses.dataclass(frozen=True)
-class Job(Task):
+class JobData(Task):
     reward: int
     num_of_steps: int
-    cairo_pie: bytearray
-    registry_address: bytearray
-    public_key: bytearray
-    signature: bytearray
+    cairo_pie_compressed: List[int]
+    registry_address: str
 
     def load_task(self) -> "CairoPieTask":
-        """
-        Loads the PIE to memory.
-        """
         return CairoPieTask(
-            cairo_pie=CairoPie.deserialize(self.cairo_pie),
-            use_poseidon=self.use_poseidon,
+            cairo_pie=CairoPie.deserialize(bytes(self.cairo_pie_compressed)),
+            use_poseidon=True,
         )
+
+
+@dataclasses.dataclass(frozen=True)
+class Job(Task):
+    job_data: JobData
+    public_key: List[int]
+    signature: List[int]
+
+    def load_task(self) -> "CairoPieTask":
+        return self.job_data.load_task()
 
 
 @marshmallow_dataclass.dataclass(frozen=True)
 class SimpleBootloaderInput(ValidatedMarshmallowDataclass):
-    identity: bytearray
+    identity: str
     job: Job
 
     fact_topologies_path: Optional[str]

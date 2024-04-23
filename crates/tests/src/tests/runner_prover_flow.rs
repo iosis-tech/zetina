@@ -1,4 +1,6 @@
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
+use libsecp256k1::{PublicKey, SecretKey};
+use rand::thread_rng;
 use sharp_p2p_prover::{
     stone_prover::{
         types::{
@@ -35,9 +37,13 @@ pub fn params() -> Params {
 
 #[tokio::test]
 async fn run_single_job() {
+    let mut rng = thread_rng();
     let runner_fixture = runner_fixture();
 
-    let runner = CairoRunner::new(runner_fixture.program_path);
+    let runner = CairoRunner::new(
+        runner_fixture.program_path,
+        PublicKey::from_secret_key(&SecretKey::random(&mut rng)),
+    );
     let prover = StoneProver::new(config(), params());
 
     runner
@@ -51,10 +57,14 @@ async fn run_single_job() {
 
 #[tokio::test]
 async fn run_multiple_job() {
+    let mut rng = thread_rng();
     let runner_fixture1 = runner_fixture();
     let runner_fixture2 = runner_fixture();
 
-    let runner = CairoRunner::new(runner_fixture1.program_path);
+    let runner = CairoRunner::new(
+        runner_fixture1.program_path,
+        PublicKey::from_secret_key(&SecretKey::random(&mut rng)),
+    );
     let prover = StoneProver::new(config(), params());
     let mut futures = FuturesUnordered::new();
 
