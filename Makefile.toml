@@ -18,3 +18,41 @@ args = ["build"]
 workspace = false
 command = "cargo"
 args = ["nextest", "run", "--workspace", "${@}"]
+
+[tasks.python-requirements-install]
+workspace = false
+command = "pip"
+args = ["install", "-r", "requirements.txt"]
+
+[tasks.python-bootloader-install]
+workspace = false
+command = "pip"
+args = ["install", "cairo/"]
+
+[tasks.stone-prover-clone]
+workspace = false
+ignore_errors = true
+command = "git"
+args = ["clone", "https://github.com/starkware-libs/stone-prover.git"]
+
+[tasks.stone-prover-build]
+workspace = false
+dependencies = ["stone-prover-clone"]
+script = ["cd stone-prover && docker build --tag prover ."]
+
+[tasks.stone-prover-install]
+workspace = false
+dependencies = ["stone-prover-build"]
+script = [
+    "container_id=$(docker create prover)",
+    "docker cp -L ${container_id}:/bin/cpu_air_prover $HOME/.local/bin",
+    "docker cp -L ${container_id}:/bin/cpu_air_verifier $HOME/.local/bin",
+]
+
+[tasks.setup]
+workspace = false
+dependencies = [
+    "python-requirements-install",
+    "python-bootloader-install",
+    "stone-prover-install",
+]
