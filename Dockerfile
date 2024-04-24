@@ -40,6 +40,7 @@ RUN apt-get update && \
     python3-openssl \
     git \
     libgmp-dev \
+    libdw1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Pyenv
@@ -65,6 +66,9 @@ RUN eval "$(pyenv init -)" && \
 
 # Install docker
 RUN curl -fsSL https://get.docker.com | bash
+
+RUN mkdir -p /root/.local/bin
+RUN echo 'export PATH="/root/.local/bin:$PATH"' >> /root/.bashrc
 
 # Set the working directory
 WORKDIR /workshop
