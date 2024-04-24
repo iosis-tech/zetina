@@ -1,3 +1,8 @@
+/*
+    Network
+    This defines the network that the node is connected to.
+*/
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Network {
     Mainnet,
