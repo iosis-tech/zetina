@@ -18,6 +18,12 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Display installed Rust version
 RUN rustc --version && cargo --version
 
+# Install cargo-make
+RUN cargo install --force cargo-make
+
+# Install cargo-nextest
+RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+
 # Install dependencies for Pyenv and Python
 RUN apt-get update && \
     apt-get install -y \
