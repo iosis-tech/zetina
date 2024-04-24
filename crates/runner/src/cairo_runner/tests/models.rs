@@ -1,6 +1,7 @@
 use rand::{thread_rng, Rng};
-use sharp_p2p_common::job::Job;
-use std::{env, path::PathBuf};
+use sharp_p2p_common::job::{Job, JobData};
+use starknet::providers::sequencer::models::L1Address;
+use std::{env, fs, path::PathBuf};
 
 pub struct TestFixture {
     pub job: Job,
@@ -16,11 +17,13 @@ pub fn fixture() -> TestFixture {
     let program_path = ws_root.join("target/bootloader.json");
 
     TestFixture {
-        job: Job::new(
-            rng.gen(),
-            rng.gen(),
-            cairo_pie_path,
-            hex::encode(rng.gen::<[u8; 32]>()).as_str(),
+        job: Job::from_job_data(
+            JobData::new(
+                rng.gen(),
+                rng.gen(),
+                fs::read(cairo_pie_path).unwrap(),
+                L1Address::random(),
+            ),
             libsecp256k1::SecretKey::random(&mut rng),
         ),
         program_path,

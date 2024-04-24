@@ -1,7 +1,8 @@
-use self::types::input::{BootloaderInput, BootloaderTask};
+use self::types::input::SimpleBootloaderInput;
 use crate::{errors::RunnerControllerError, traits::RunnerController};
 use async_process::Stdio;
 use futures::Future;
+use libsecp256k1::PublicKey;
 use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace, layout::Layout, process::Process};
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
@@ -17,11 +18,12 @@ pub mod types;
 
 pub struct CairoRunner {
     program_path: PathBuf,
+    public_key: PublicKey,
 }
 
 impl CairoRunner {
-    pub fn new(program_path: PathBuf) -> Self {
-        Self { program_path }
+    pub fn new(program_path: PathBuf, public_key: PublicKey) -> Self {
+        Self { program_path, public_key }
     }
 }
 
@@ -33,18 +35,14 @@ impl RunnerController for CairoRunner {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
         let future: Pin<Box<dyn Future<Output = Result<JobTrace, RunnerControllerError>> + '_>> =
             Box::pin(async move {
+                let job_hash = hash!(job);
                 let layout: &str = Layout::RecursiveWithPoseidon.into();
 
                 let mut cairo_pie = NamedTempFile::new()?;
-                cairo_pie.write_all(&job.cairo_pie_compressed)?;
+                cairo_pie.write_all(&job.job_data.cairo_pie_compressed)?;
 
-                let input = BootloaderInput {
-                    tasks: vec![BootloaderTask {
-                        path: cairo_pie.path().to_path_buf(),
-                        ..Default::default()
-                    }],
-                    ..Default::default()
-                };
+                let input =
+                    SimpleBootloaderInput { identity: self.public_key, job, single_page: true };
 
                 let mut program_input = NamedTempFile::new()?;
                 program_input.write_all(&serde_json::to_string(&input)?.into_bytes())?;
@@ -74,8 +72,6 @@ impl RunnerController for CairoRunner {
                     .arg("--print_output")
                     .stdout(Stdio::null())
                     .spawn()?;
-
-                let job_hash = hash!(job);
 
                 debug!("task {} spawned", job_hash);
 

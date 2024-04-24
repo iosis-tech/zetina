@@ -2,6 +2,14 @@ use libp2p::gossipsub::IdentTopic;
 
 use crate::network::Network;
 
+/*
+    Topic
+    This defines the topic of the message used in the gossipsub protocol.
+    The topic is used to filter messages and route them to the correct subscribers.
+    `NewJob` is used to notify the network of a new job from Delegator to Executor.
+    `PickedJob` is used to notify the network of a job that has been picked up by an Executor.
+*/
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Topic {
     NewJob,

@@ -1,20 +1,22 @@
 import json
 import os
-from typing import Any, List, Union
-
+from typing import List
 import aiofiles
-
 from starkware.cairo.bootloaders.fact_topology import (
     FactTopologiesFile,
     FactTopology,
     get_fact_topology_from_additional_data,
 )
-from bootloader.objects import CairoPieTask, RunProgramTask, Task
+from bootloader.objects import CairoPieTask, Task
 from starkware.cairo.common.hash_state import compute_hash_on_elements
 from starkware.cairo.lang.compiler.program import Program
 from starkware.cairo.lang.vm.cairo_pie import CairoPie, ExecutionResources
 from starkware.cairo.lang.vm.output_builtin_runner import OutputBuiltinRunner
-from starkware.cairo.lang.vm.relocatable import MaybeRelocatable, RelocatableValue, relocate_value
+from starkware.cairo.lang.vm.relocatable import (
+    MaybeRelocatable,
+    RelocatableValue,
+    relocate_value,
+)
 from starkware.python.utils import WriteOnceDict, from_bytes
 
 SIMPLE_BOOTLOADER_COMPILED_PATH = os.path.join(
@@ -89,7 +91,7 @@ def write_return_builtins(
     used_builtins_addr,
     pre_execution_builtins_addr,
     task,
-    all_builtins
+    all_builtins,
 ):
     """
     Writes the updated builtin pointers after the program execution to the given return builtins
@@ -100,7 +102,9 @@ def write_return_builtins(
     used_builtin_offset = 0
     for index, builtin in enumerate(all_builtins):
         if builtin in used_builtins:
-            memory[return_builtins_addr + index] = memory[used_builtins_addr + used_builtin_offset]
+            memory[return_builtins_addr + index] = memory[
+                used_builtins_addr + used_builtin_offset
+            ]
             used_builtin_offset += 1
 
             if isinstance(task, CairoPie):
@@ -110,7 +114,9 @@ def write_return_builtins(
                 ), "Builtin usage is inconsistent with the CairoPie."
         else:
             # The builtin is unused, hence its value is the same as before calling the program.
-            memory[return_builtins_addr + index] = memory[pre_execution_builtins_addr + index]
+            memory[return_builtins_addr + index] = memory[
+                pre_execution_builtins_addr + index
+            ]
 
 
 def load_cairo_pie(
@@ -168,59 +174,31 @@ def load_cairo_pie(
     esdsa_additional_data = task.additional_data.get("ecdsa_builtin")
     if esdsa_additional_data is not None:
         ecdsa_builtin = builtin_runners.get("ecdsa_builtin")
-        assert ecdsa_builtin is not None, "The task requires the ecdsa builtin but it is missing."
-        ecdsa_builtin.extend_additional_data(esdsa_additional_data, local_relocate_value)
+        assert (
+            ecdsa_builtin is not None
+        ), "The task requires the ecdsa builtin but it is missing."
+        ecdsa_builtin.extend_additional_data(
+            esdsa_additional_data, local_relocate_value
+        )
 
     for addr, val in task.memory.items():
         memory[local_relocate_value(addr)] = local_relocate_value(val)
 
 
-def prepare_output_runner(
-    task: Task, output_builtin: OutputBuiltinRunner, output_ptr: RelocatableValue
-):
-    """
-    Prepares the output builtin if the type of task is Task, so that pages of the inner program
-    will be recorded separately.
-    If the type of task is CairoPie, nothing should be done, as the program does not contain
-    hints that may affect the output builtin.
-    The return value of this function should be later passed to get_task_fact_topology().
-    """
-
-    if isinstance(task, RunProgramTask):
-        output_state = output_builtin.get_state()
-        output_builtin.new_state(base=output_ptr)
-        return output_state
-    elif isinstance(task, CairoPieTask):
-        return None
-    else:
-        raise NotImplementedError(f"Unexpected task type: {type(task).__name__}.")
-
-
 def get_task_fact_topology(
     output_size: int,
-    task: Union[RunProgramTask, CairoPie],
-    output_builtin: OutputBuiltinRunner,
-    output_runner_data: Any,
+    task: CairoPie,
 ) -> FactTopology:
     """
-    Returns the fact_topology that corresponds to 'task'. Restores output builtin state if 'task' is
-    a RunProgramTask.
+    Returns the fact_topology that corresponds to 'task'.
     """
 
-    # Obtain the fact_toplogy of 'task'.
-    if isinstance(task, RunProgramTask):
-        assert output_runner_data is not None
+    if isinstance(task, CairoPieTask):
         fact_topology = get_fact_topology_from_additional_data(
             output_size=output_size,
-            output_builtin_additional_data=output_builtin.get_additional_data(),
-        )
-        # Restore the output builtin runner to its original state.
-        output_builtin.set_state(output_runner_data)
-    elif isinstance(task, CairoPieTask):
-        assert output_runner_data is None
-        fact_topology = get_fact_topology_from_additional_data(
-            output_size=output_size,
-            output_builtin_additional_data=task.cairo_pie.additional_data["output_builtin"],
+            output_builtin_additional_data=task.cairo_pie.additional_data[
+                "output_builtin"
+            ],
         )
     else:
         raise NotImplementedError(f"Unexpected task type: {type(task).__name__}.")
@@ -237,7 +215,9 @@ def add_consecutive_output_pages(
     offset = 0
     for i, page_size in enumerate(fact_topology.page_sizes):
         output_builtin.add_page(
-            page_id=cur_page_id + i, page_start=output_start + offset, page_size=page_size
+            page_id=cur_page_id + i,
+            page_start=output_start + offset,
+            page_size=page_size,
         )
         offset += page_size
 
@@ -268,10 +248,14 @@ def configure_fact_topologies(
         output_start += sum(fact_topology.page_sizes)
 
 
-def write_to_fact_topologies_file(fact_topologies_path: str, fact_topologies: List[FactTopology]):
+def write_to_fact_topologies_file(
+    fact_topologies_path: str, fact_topologies: List[FactTopology]
+):
     with open(fact_topologies_path, "w") as fp:
         json.dump(
-            FactTopologiesFile.Schema().dump(FactTopologiesFile(fact_topologies=fact_topologies)),
+            FactTopologiesFile.Schema().dump(
+                FactTopologiesFile(fact_topologies=fact_topologies)
+            ),
             fp,
             indent=4,
             sort_keys=True,
@@ -279,17 +263,24 @@ def write_to_fact_topologies_file(fact_topologies_path: str, fact_topologies: Li
         fp.write("\n")
 
 
-def calc_simple_bootloader_execution_resources(program_length: int) -> ExecutionResources:
+def calc_simple_bootloader_execution_resources(
+    program_length: int,
+) -> ExecutionResources:
     """
     Returns an upper bound on the number of steps and builtin instances that the simple bootloader
     uses.
     """
-    n_steps = SIMPLE_BOOTLOADER_N_STEPS_RATIO * program_length + SIMPLE_BOOTLOADER_N_STEPS_CONSTANT
+    n_steps = (
+        SIMPLE_BOOTLOADER_N_STEPS_RATIO * program_length
+        + SIMPLE_BOOTLOADER_N_STEPS_CONSTANT
+    )
     builtin_instance_counter = {
         "pedersen_builtin": SIMPLE_BOOTLOADER_N_PEDERSEN + program_length,
         "range_check_builtin": SIMPLE_BOOTLOADER_N_RANGE_CHECKS,
         "output_builtin": SIMPLE_BOOTLOADER_N_OUTPUT,
     }
     return ExecutionResources(
-        n_steps=n_steps, builtin_instance_counter=builtin_instance_counter, n_memory_holes=0
+        n_steps=n_steps,
+        builtin_instance_counter=builtin_instance_counter,
+        n_memory_holes=0,
     )

@@ -1,8 +1,11 @@
 use crate::{errors::CompilerControllerError, traits::CompilerController};
 use async_process::Stdio;
 use futures::Future;
+use libsecp256k1::SecretKey;
+use sharp_p2p_common::job::JobData;
 use sharp_p2p_common::layout::Layout;
 use sharp_p2p_common::{job::Job, process::Process};
+use starknet::providers::sequencer::models::L1Address;
 use std::path::PathBuf;
 use std::{io::Read, pin::Pin};
 use tempfile::NamedTempFile;
@@ -11,17 +14,13 @@ use tracing::debug;
 
 pub mod tests;
 
-pub struct CairoCompiler {}
-
-impl CairoCompiler {
-    pub fn new() -> Self {
-        Self {}
-    }
+pub struct CairoCompiler {
+    signing_key: SecretKey,
 }
 
-impl Default for CairoCompiler {
-    fn default() -> Self {
-        Self::new()
+impl CairoCompiler {
+    pub fn new(signing_key: SecretKey) -> Self {
+        Self { signing_key }
     }
 }
 
@@ -104,8 +103,15 @@ impl CompilerController for CairoCompiler {
                 let mut cairo_pie_bytes = Vec::new();
                 cairo_pie.read_to_end(&mut cairo_pie_bytes)?;
 
-                // TODO: calculate details
-                Ok(Job { cairo_pie_compressed: cairo_pie_bytes, ..Default::default() })
+                Ok(Job::from_job_data(
+                    JobData {
+                        reward: 0,       // TODO: calculate this properly
+                        num_of_steps: 0, // TODO: calculate this properly
+                        cairo_pie_compressed: cairo_pie_bytes,
+                        registry_address: L1Address::random(),
+                    },
+                    self.signing_key,
+                ))
             });
 
         Ok(Process::new(future, terminate_tx))

@@ -13,6 +13,8 @@ sharp-p2p-prover.workspace = true
 sharp-p2p-runner.workspace = true
 sharp-p2p-compiler.workspace = true
 tokio.workspace = true
+libsecp256k1.workspace = true
+rand.workspace = true
 
 [features]
 full_test = []

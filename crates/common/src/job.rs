@@ -1,10 +1,13 @@
 use crate::hash;
-use libsecp256k1::{curve::Scalar, sign, Message, PublicKey, SecretKey, Signature};
+use libsecp256k1::{Message, PublicKey, SecretKey, Signature};
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use starknet::core::types::FromByteSliceError;
+use starknet::providers::sequencer::models::L1Address;
+use starknet_crypto::{poseidon_hash_many, FieldElement};
 use std::{
     fmt::Display,
-    fs,
     hash::{DefaultHasher, Hash, Hasher},
-    path::PathBuf,
 };
 
 /*
@@ -16,61 +19,74 @@ use std::{
     The Job object also includes the target registry where the delegator expects this proof to be verified.
 */
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[serde_as]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Job {
-    pub reward: u32,                   // The reward offered for completing the task
-    pub num_of_steps: u32, // The number of steps expected to complete the task (executor ensures that this number is greater than or equal to the actual steps; in the future, the executor may charge a fee to the delegator if not met)
-    pub cairo_pie_compressed: Vec<u8>, // The task bytecode in compressed zip format, to conserve memory
-    pub registry_address: String, // The address of the registry contract where the delegator expects the proof to be verified
-    pub public_key: PublicKey, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
-    pub signature: Signature, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
+    pub job_data: JobData,
+    #[serde_as(as = "[_; 65]")]
+    pub public_key: [u8; 65], // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
+    #[serde_as(as = "[_; 64]")]
+    pub signature: [u8; 64], // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
 }
 
 impl Job {
+    pub fn from_job_data(job_data: JobData, secret_key: SecretKey) -> Self {
+        let felts: Vec<FieldElement> = job_data.to_owned().try_into().unwrap();
+        let message = Message::parse(&poseidon_hash_many(&felts).to_bytes_be());
+        let (signature, _recovery) = libsecp256k1::sign(&message, &secret_key);
+
+        Self {
+            job_data,
+            public_key: PublicKey::from_secret_key(&secret_key).serialize(),
+            signature: signature.serialize(),
+        }
+    }
+
+    pub fn verify_signature(&self) -> bool {
+        let felts: Vec<FieldElement> = self.job_data.to_owned().try_into().unwrap();
+        let message = Message::parse(&poseidon_hash_many(&felts).to_bytes_be());
+        let signature = Signature::parse_overflowing(&self.signature);
+        let pubkey = PublicKey::parse(&self.public_key).unwrap();
+        libsecp256k1::verify(&message, &signature, &pubkey)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JobData {
+    pub reward: u32,
+    pub num_of_steps: u32,
+    pub cairo_pie_compressed: Vec<u8>,
+    pub registry_address: L1Address,
+}
+
+impl JobData {
     pub fn new(
         reward: u32,
         num_of_steps: u32,
-        cairo_pie_file: PathBuf,
-        registry_address: &str,
-        secret_key: SecretKey,
+        cairo_pie_compressed: Vec<u8>,
+        registry_address: L1Address,
     ) -> Self {
-        Self {
-            reward,
-            num_of_steps,
-            cairo_pie_compressed: fs::read(cairo_pie_file).unwrap(),
-            registry_address: registry_address.to_string(),
-            public_key: PublicKey::from_secret_key(&secret_key),
-            signature: libsecp256k1::sign(
-                // TODO proper impl just mocked rn for tests
-                &Message::parse(&[
-                    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-                    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-                ]),
-                &secret_key,
-            )
-            .0,
-        }
+        Self { reward, num_of_steps, cairo_pie_compressed, registry_address }
     }
 }
 
-impl Default for Job {
-    fn default() -> Self {
-        let secret_key = &SecretKey::default();
-        let public_key = PublicKey::from_secret_key(secret_key);
-        let (signature, _recovery_id) =
-            sign(&libsecp256k1::Message(Scalar([0, 0, 0, 0, 0, 0, 0, 0])), secret_key);
-        Self {
-            reward: 0,
-            num_of_steps: 0,
-            cairo_pie_compressed: vec![1, 2, 3],
-            public_key,
-            signature,
-            registry_address: "0x0".to_string(),
-        }
+impl TryFrom<JobData> for Vec<FieldElement> {
+    type Error = FromByteSliceError;
+    fn try_from(value: JobData) -> Result<Self, Self::Error> {
+        let mut felts: Vec<FieldElement> =
+            vec![FieldElement::from(value.reward), FieldElement::from(value.num_of_steps)];
+        felts.extend(
+            value
+                .cairo_pie_compressed
+                .chunks(31)
+                .map(|chunk| FieldElement::from_byte_slice_be(chunk).unwrap()),
+        );
+        felts.push(FieldElement::from_byte_slice_be(&value.registry_address.to_fixed_bytes())?);
+        Ok(felts)
     }
 }
 
-impl Hash for Job {
+impl Hash for JobData {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.reward.hash(state);
         self.num_of_steps.hash(state);
@@ -79,18 +95,14 @@ impl Hash for Job {
     }
 }
 
+impl Hash for Job {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.job_data.hash(state)
+    }
+}
+
 impl Display for Job {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", hex::encode(hash!(self).to_be_bytes()))
     }
 }
-
-// impl Job {
-//     pub fn serialize_job(&self) -> Vec<u8> {
-//         bincode::serialize(self).unwrap()
-//     }
-
-//     pub fn deserialize_job(serialized_job: &[u8]) -> Self {
-//         bincode::deserialize(serialized_job).unwrap()
-//     }
-// }

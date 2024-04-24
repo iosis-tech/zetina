@@ -21,7 +21,7 @@ func run_simple_bootloader{
     local task_range_check_ptr;
 
     %{
-        n_tasks = len(simple_bootloader_input.tasks)
+        n_tasks = 1
         memory[ids.output_ptr] = n_tasks
 
         # Task range checks are located right after simple bootloader validation range checks, and
@@ -65,7 +65,6 @@ func run_simple_bootloader{
     // Call execute_tasks.
     let (__fp__, _) = get_fp_and_pc();
 
-    %{ tasks = simple_bootloader_input.tasks %}
     let builtin_ptrs = &builtin_ptrs_before;
     let self_range_check_ptr = range_check_ptr;
     with builtin_ptrs, self_range_check_ptr {
@@ -141,8 +140,7 @@ func execute_tasks{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
         from bootloader.objects import Task
 
         # Pass current task to execute_task.
-        task_id = len(simple_bootloader_input.tasks) - ids.n_tasks
-        task = simple_bootloader_input.tasks[task_id].load_task()
+        task = simple_bootloader_input.job.load_task()
     %}
     tempvar use_poseidon = nondet %{ 1 if task.use_poseidon else 0 %};
     // Call execute_task to execute the current task.
