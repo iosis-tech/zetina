@@ -8,5 +8,7 @@ pub mod process;
 pub mod topic;
 pub mod vec252;
 
+mod fuzzing;
+
 #[cfg(test)]
 pub mod tests;

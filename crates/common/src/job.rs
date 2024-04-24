@@ -1,9 +1,5 @@
 use crate::hash;
 use libsecp256k1::{Message, PublicKey, SecretKey, Signature};
-use proptest::arbitrary::any;
-use proptest::prop_compose;
-use proptest::strategy::BoxedStrategy;
-use proptest::{arbitrary::Arbitrary, strategy::Strategy};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use starknet::core::types::FromByteSliceError;
@@ -108,40 +104,5 @@ impl Hash for Job {
 impl Display for Job {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", hex::encode(hash!(self).to_be_bytes()))
-    }
-}
-
-prop_compose! {
-    fn arb_state()(
-        reward in any::<u32>(),
-        num_of_steps in any::<u32>(),
-        cairo_pie_compressed in any::<Vec<u8>>(),
-        secret_key in any::<[u8; 32]>()
-    ) -> (u32, u32, Vec<u8>, [u8; 32]) {
-        (reward, num_of_steps, cairo_pie_compressed, secret_key)
-    }
-}
-
-impl Arbitrary for Job {
-    type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-    fn arbitrary() -> Self::Strategy {
-        let abs_state = arb_state();
-        abs_state
-            .prop_map(|(reward, num_of_steps, cairo_pie_compressed, secret_key)| {
-                Job::from_job_data(
-                    JobData {
-                        reward,
-                        num_of_steps,
-                        cairo_pie_compressed,
-                        registry_address: L1Address::random(),
-                    },
-                    libsecp256k1::SecretKey::parse(&secret_key).unwrap(),
-                )
-            })
-            .boxed()
-    }
-    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        Self::arbitrary()
     }
 }
