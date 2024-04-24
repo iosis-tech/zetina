@@ -1,8 +1,8 @@
 import subprocess
 
-from colorama import Fore, Style
-
 def log_and_run(commands, description, cwd=None):
+    from colorama import Fore, Style
+    
     full_command = " && ".join(commands)
     try:
         print(f"{Fore.YELLOW}Starting: {description}...{Style.RESET_ALL}")
@@ -19,7 +19,6 @@ def log_and_run(commands, description, cwd=None):
 
 if __name__ == "__main__":
     subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
-    from colorama import Fore, Style
 
     log_and_run(["pip install cairo/"], "Install bootloader package", cwd=".")
 
