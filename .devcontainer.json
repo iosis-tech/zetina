@@ -2,6 +2,9 @@
     "build": {
         "dockerfile": "Dockerfile"
     },
+    "mounts": [
+        "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+    ],
     "workspaceMount": "type=bind,source=${localWorkspaceFolder},destination=/workshop/sharp-p2p",
     "workspaceFolder": "/workshop/sharp-p2p"
 }

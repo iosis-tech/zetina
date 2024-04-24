@@ -7,8 +7,6 @@ RUN apt-get update && \
     curl \
     gcc \
     libc6-dev \
-    python3 \
-    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust using Rustup
@@ -41,25 +39,32 @@ RUN apt-get update && \
     liblzma-dev \
     python3-openssl \
     git \
+    libgmp-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Pyenv
 RUN curl https://pyenv.run | bash
 
-# Set Pyenv environment variables
-ENV PYENV_ROOT="/root/.pyenv"
-ENV PATH="$PYENV_ROOT/bin:$PATH"
-
 RUN echo 'export PATH="/root/.pyenv/bin:$PATH"' >> /root/.bashrc && \
     echo 'eval "$(pyenv init -)"' >> /root/.bashrc && \
     echo 'eval "$(pyenv virtualenv-init -)"' >> /root/.bashrc
 
-# Reload bash
-RUN bash -c 'exec $SHELL'
+SHELL ["/bin/bash", "-c"]
+
+# Set Pyenv environment variables
+ENV PATH="/root/.pyenv/bin:$PATH"
 
 # Install Python 3.9.0 using Pyenv
-RUN bash -c 'pyenv install 3.9.0' && \
-    bash -c 'pyenv global 3.9.0'
+RUN eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    pyenv install 3.9.0 && \
+    pyenv global 3.9.0 && \
+    pyenv --version && \
+    python -V && \
+    pip install --upgrade pip
+
+# Install docker
+RUN curl -fsSL https://get.docker.com | bash
 
 # Set the working directory
 WORKDIR /workshop
