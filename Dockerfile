@@ -64,8 +64,5 @@ RUN bash -c 'pyenv install 3.9.0' && \
 # Set the working directory
 WORKDIR /workshop
 
-# Copy the application code into the container
-COPY . .
-
 # Set the default command to run when the container starts
 CMD ["bash"]

@@ -1,5 +1,7 @@
 {
     "build": {
         "dockerfile": "Dockerfile"
-    }
+    },
+    "workspaceMount": "type=bind,source=${localWorkspaceFolder},destination=/workshop/sharp-p2p",
+    "workspaceFolder": "/workshop/sharp-p2p"
 }
