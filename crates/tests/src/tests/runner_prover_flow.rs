@@ -16,35 +16,13 @@ use sharp_p2p_runner::{
     traits::RunnerController,
 };
 
-pub fn config() -> Config {
-    Config::default()
-}
-
-pub fn params() -> Params {
-    Params {
-        stark: Stark {
-            fri: Fri {
-                fri_step_list: vec![0, 4, 4, 4, 1],
-                last_layer_degree_bound: 128,
-                n_queries: 1,
-                proof_of_work_bits: 1,
-            },
-            log_n_cosets: 1,
-        },
-        ..Default::default()
-    }
-}
-
 #[tokio::test]
 async fn run_single_job() {
-    let mut rng = thread_rng();
     let runner_fixture = runner_fixture();
 
-    let runner = CairoRunner::new(
-        runner_fixture.program_path,
-        PublicKey::from_secret_key(&SecretKey::random(&mut rng)),
-    );
-    let prover = StoneProver::new(config(), params());
+    let identity = Keypair::generate();
+    let runner = CairoRunner::new(runner_fixture.program_path, identity.public());
+    let prover = StoneProver::new();
 
     runner
         .run(runner_fixture.job)
@@ -57,15 +35,12 @@ async fn run_single_job() {
 
 #[tokio::test]
 async fn run_multiple_job() {
-    let mut rng = thread_rng();
     let runner_fixture1 = runner_fixture();
     let runner_fixture2 = runner_fixture();
 
-    let runner = CairoRunner::new(
-        runner_fixture1.program_path,
-        PublicKey::from_secret_key(&SecretKey::random(&mut rng)),
-    );
-    let prover = StoneProver::new(config(), params());
+    let identity = Keypair::generate();
+    let runner = CairoRunner::new(runner_fixture1.program_path, identity.public());
+    let prover = StoneProver::new();
     let mut futures = FuturesUnordered::new();
 
     let job_witness1 = runner

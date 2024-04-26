@@ -2,7 +2,7 @@ use self::types::input::SimpleBootloaderInput;
 use crate::{errors::RunnerControllerError, traits::RunnerController};
 use async_process::Stdio;
 use futures::Future;
-use libsecp256k1::PublicKey;
+use libp2p::identity::ecdsa::PublicKey;
 use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace, layout::Layout, process::Process};
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
@@ -16,18 +16,18 @@ use tracing::debug;
 pub mod tests;
 pub mod types;
 
-pub struct CairoRunner {
+pub struct CairoRunner<'identity> {
     program_path: PathBuf,
-    public_key: PublicKey,
+    public_key: &'identity PublicKey,
 }
 
-impl CairoRunner {
-    pub fn new(program_path: PathBuf, public_key: PublicKey) -> Self {
+impl<'identity> CairoRunner<'identity> {
+    pub fn new(program_path: PathBuf, public_key: &'identity PublicKey) -> Self {
         Self { program_path, public_key }
     }
 }
 
-impl RunnerController for CairoRunner {
+impl<'identity> RunnerController for CairoRunner<'identity> {
     fn run(
         &self,
         job: Job,
@@ -41,8 +41,11 @@ impl RunnerController for CairoRunner {
                 let mut cairo_pie = NamedTempFile::new()?;
                 cairo_pie.write_all(&job.job_data.cairo_pie_compressed)?;
 
-                let input =
-                    SimpleBootloaderInput { identity: self.public_key, job, single_page: true };
+                let input = SimpleBootloaderInput {
+                    public_key: self.public_key.to_bytes(),
+                    job,
+                    single_page: true,
+                };
 
                 let mut program_input = NamedTempFile::new()?;
                 program_input.write_all(&serde_json::to_string(&input)?.into_bytes())?;

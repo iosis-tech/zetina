@@ -25,7 +25,7 @@ pub fn fixture() -> TestFixture {
                 fs::read(cairo_pie_path).unwrap(),
                 FieldElement::ZERO,
             ),
-            libp2p::identity::ecdsa::Keypair::generate(),
+            &libp2p::identity::ecdsa::Keypair::generate(),
         ),
         program_path,
     }

@@ -17,3 +17,6 @@ starknet.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
+futures.workspace = true
+sharp-p2p-prover.workspace = true
+sharp-p2p-runner.workspace = true

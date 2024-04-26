@@ -16,10 +16,8 @@ async fn run_single_job() {
     let runner_fixture = runner_fixture();
 
     let compiler = CairoCompiler::new(libsecp256k1::SecretKey::random(&mut rng));
-    let runner = CairoRunner::new(
-        runner_fixture.program_path,
-        PublicKey::from_secret_key(&SecretKey::random(&mut rng)),
-    );
+    let identity = Keypair::generate();
+    let runner = CairoRunner::new(runner_fixture.program_path, identity.public());
 
     compiler
         .run(compiler_fixture.program_path, compiler_fixture.program_input_path)
@@ -41,10 +39,8 @@ async fn run_multiple_job() {
     let runner_fixture1 = runner_fixture();
 
     let compiler = CairoCompiler::new(libsecp256k1::SecretKey::random(&mut rng));
-    let runner = CairoRunner::new(
-        runner_fixture1.program_path,
-        PublicKey::from_secret_key(&SecretKey::random(&mut rng)),
-    );
+    let identity = Keypair::generate();
+    let runner = CairoRunner::new(runner_fixture1.program_path, identity.public());
     let mut futures = FuturesUnordered::new();
 
     let job_trace1 = compiler

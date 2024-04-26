@@ -1,6 +1,7 @@
 pub mod hash_macro;
 pub mod identity;
 pub mod job;
+pub mod job_record;
 pub mod job_trace;
 pub mod job_witness;
 pub mod layout;

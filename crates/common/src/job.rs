@@ -1,4 +1,5 @@
 use crate::hash;
+use libp2p::identity::ecdsa::Keypair;
 use serde::{Deserialize, Serialize};
 use starknet::core::types::FromByteSliceError;
 use starknet_crypto::FieldElement;
@@ -15,7 +16,7 @@ use std::{
     Additionally, the object holds the signature and public key of the delegator, enabling the executor to prove to the Registry that the task was intended by the delegator.
     The Job object also includes the target registry where the delegator expects this proof to be verified.
 */
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub job_data: JobData,
     pub public_key: Vec<u8>, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
@@ -23,7 +24,7 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn from_job_data(job_data: JobData, key_pair: libp2p::identity::ecdsa::Keypair) -> Self {
+    pub fn from_job_data(job_data: JobData, key_pair: &Keypair) -> Self {
         let message: Vec<u8> = job_data.to_owned().try_into().unwrap();
         let public_key = key_pair.public();
         let signature = key_pair.sign(&message);
@@ -39,7 +40,7 @@ impl Job {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct JobData {
     pub reward: u32,
     pub num_of_steps: u32,

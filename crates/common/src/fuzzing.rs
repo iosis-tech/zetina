@@ -34,7 +34,7 @@ impl Arbitrary for Job {
                         cairo_pie_compressed,
                         registry_address: FieldElement::ZERO,
                     },
-                    libp2p::identity::ecdsa::Keypair::generate(),
+                    &libp2p::identity::ecdsa::Keypair::generate(),
                 )
             })
             .boxed()

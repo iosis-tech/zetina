@@ -45,7 +45,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Read cairo program path from stdin
     let mut stdin = BufReader::new(stdin()).lines();
-    let compiler = CairoCompiler::new(identity_handler.get_ecdsa_keypair(), registry_address);
+    let identity = identity_handler.get_ecdsa_keypair();
+    let compiler = CairoCompiler::new(&identity, registry_address);
 
     loop {
         tokio::select! {

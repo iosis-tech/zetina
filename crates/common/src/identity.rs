@@ -22,14 +22,14 @@ impl IdentityHandler {
     }
 
     pub fn get_keypair(&self) -> libp2p::identity::Keypair {
-        self.p2p_keypair.clone()
+        self.p2p_keypair.to_owned()
     }
 
     pub fn get_ecdsa_keypair(&self) -> libp2p::identity::ecdsa::Keypair {
-        <libp2p::identity::Keypair as Clone>::clone(&self.p2p_keypair).try_into_ecdsa().unwrap()
+        self.p2p_keypair.to_owned().try_into_ecdsa().unwrap()
     }
 
     pub fn get_signing_key(&self) -> SigningKey {
-        self.signing_key.clone()
+        self.signing_key.to_owned()
     }
 }

@@ -1,4 +1,7 @@
-use self::types::{config::Config, params::Params};
+use self::types::{
+    config::Config,
+    params::{Fri, Params, Stark},
+};
 use crate::{errors::ProverControllerError, traits::ProverController};
 use async_process::Stdio;
 use futures::Future;
@@ -18,14 +21,11 @@ use tracing::debug;
 pub mod tests;
 pub mod types;
 
-pub struct StoneProver {
-    cpu_air_prover_config: Config,
-    cpu_air_params: Params,
-}
+pub struct StoneProver {}
 
 impl StoneProver {
-    pub fn new(cpu_air_prover_config: Config, cpu_air_params: Params) -> Self {
-        Self { cpu_air_prover_config, cpu_air_params }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -42,10 +42,8 @@ impl ProverController for StoneProver {
                 let mut cpu_air_prover_config = NamedTempFile::new()?;
                 let mut cpu_air_params = NamedTempFile::new()?;
 
-                cpu_air_prover_config
-                    .write_all(&serde_json::to_string(&self.cpu_air_prover_config)?.into_bytes())?;
-                cpu_air_params
-                    .write_all(&serde_json::to_string(&self.cpu_air_params)?.into_bytes())?;
+                cpu_air_prover_config.write_all(&serde_json::to_string(&config())?.into_bytes())?;
+                cpu_air_params.write_all(&serde_json::to_string(&params())?.into_bytes())?;
 
                 let mut task = Command::new("cpu_air_prover")
                     .arg("--out_file")
@@ -108,5 +106,30 @@ impl ProverController for StoneProver {
             });
 
         Ok(Process::new(future, terminate_tx))
+    }
+}
+
+pub fn config() -> Config {
+    Config::default()
+}
+
+pub fn params() -> Params {
+    Params {
+        stark: Stark {
+            fri: Fri {
+                fri_step_list: vec![0, 4, 4, 4, 1],
+                last_layer_degree_bound: 128,
+                n_queries: 1,
+                proof_of_work_bits: 1,
+            },
+            log_n_cosets: 1,
+        },
+        ..Default::default()
+    }
+}
+
+impl Default for StoneProver {
+    fn default() -> Self {
+        Self::new()
     }
 }

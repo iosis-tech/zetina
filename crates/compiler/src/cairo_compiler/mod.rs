@@ -1,6 +1,7 @@
 use crate::{errors::CompilerControllerError, traits::CompilerController};
 use async_process::Stdio;
 use futures::Future;
+use libp2p::identity::ecdsa::Keypair;
 use sharp_p2p_common::job::JobData;
 use sharp_p2p_common::layout::Layout;
 use sharp_p2p_common::{job::Job, process::Process};
@@ -13,18 +14,18 @@ use tracing::debug;
 
 pub mod tests;
 
-pub struct CairoCompiler {
-    keypair: libp2p::identity::ecdsa::Keypair,
+pub struct CairoCompiler<'identity> {
+    keypair: &'identity Keypair,
     registry_contract: FieldElement,
 }
 
-impl CairoCompiler {
-    pub fn new(keypair: libp2p::identity::ecdsa::Keypair, registry_contract: FieldElement) -> Self {
+impl<'identity> CairoCompiler<'identity> {
+    pub fn new(keypair: &'identity Keypair, registry_contract: FieldElement) -> Self {
         Self { keypair, registry_contract }
     }
 }
 
-impl CompilerController for CairoCompiler {
+impl<'identity> CompilerController for CairoCompiler<'identity> {
     fn run(
         &self,
         program_path: PathBuf,
@@ -110,7 +111,7 @@ impl CompilerController for CairoCompiler {
                         cairo_pie_compressed: cairo_pie_bytes,
                         registry_address: self.registry_contract,
                     },
-                    self.keypair.clone(),
+                    self.keypair,
                 ))
             });
 
