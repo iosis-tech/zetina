@@ -6,10 +6,12 @@ use crate::{errors::ProverControllerError, traits::ProverController};
 use async_process::Stdio;
 use futures::Future;
 use itertools::{chain, Itertools};
+use serde_json::Value;
 use sharp_p2p_common::{
     hash, job_trace::JobTrace, job_witness::JobWitness, process::Process, vec252::VecFelt252,
 };
 use std::{
+    fs,
     hash::{DefaultHasher, Hash, Hasher},
     io::{Read, Write},
     pin::Pin,
@@ -42,8 +44,15 @@ impl ProverController for StoneProver {
                 let mut cpu_air_prover_config = NamedTempFile::new()?;
                 let mut cpu_air_params = NamedTempFile::new()?;
 
-                cpu_air_prover_config.write_all(&serde_json::to_string(&config())?.into_bytes())?;
-                cpu_air_params.write_all(&serde_json::to_string(&params())?.into_bytes())?;
+                let n_steps: u64 = serde_json::from_str::<Value>(
+                    fs::read_to_string(job_trace.air_public_input.path())?.as_str(),
+                )?["n_steps"]
+                    .as_u64()
+                    .ok_or(ProverControllerError::NumberOfStepsUnavailable)?;
+
+                cpu_air_prover_config
+                    .write_all(&serde_json::to_string(&config(n_steps))?.into_bytes())?;
+                cpu_air_params.write_all(&serde_json::to_string(&params(n_steps))?.into_bytes())?;
 
                 let mut task = Command::new("cpu_air_prover")
                     .arg("--out_file")
@@ -109,16 +118,35 @@ impl ProverController for StoneProver {
     }
 }
 
-pub fn config() -> Config {
+pub fn config(_n_steps: u64) -> Config {
     Config::default()
 }
 
-pub fn params() -> Params {
+const fn num_bits<T>() -> usize {
+    std::mem::size_of::<T>() * 8
+}
+
+fn log_2(x: u64) -> u64 {
+    num_bits::<u64>() as u64 - x.leading_zeros() as u64 - 1
+}
+
+pub fn params(n_steps: u64) -> Params {
+    // log₂(last_layer_degree_bound) + ∑fri_step_list = log₂(#steps) + 4
+    // ∑fri_step_list = log₂(#steps) + 4 - log₂(last_layer_degree_bound)
+
+    let last_layer_degree_bound = 128;
+    let fri_step_list_sum = log_2(n_steps) + 4 - log_2(last_layer_degree_bound);
     Params {
         stark: Stark {
             fri: Fri {
-                fri_step_list: vec![0, 4, 4, 4, 1],
-                last_layer_degree_bound: 128,
+                fri_step_list: std::iter::once(0)
+                    .chain(
+                        std::iter::repeat(4)
+                            .take((fri_step_list_sum / 4) as usize)
+                            .chain(std::iter::once(fri_step_list_sum % 4)),
+                    )
+                    .collect(),
+                last_layer_degree_bound,
                 n_queries: 1,
                 proof_of_work_bits: 1,
             },

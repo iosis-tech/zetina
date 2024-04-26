@@ -9,9 +9,9 @@ pub struct CachedLdeConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     pub cached_lde_config: CachedLdeConfig,
-    pub constraint_polynomial_task_size: u32,
-    pub n_out_of_memory_merkle_layers: u32,
-    pub table_prover_n_tasks_per_segment: u32,
+    pub constraint_polynomial_task_size: u64,
+    pub n_out_of_memory_merkle_layers: u64,
+    pub table_prover_n_tasks_per_segment: u64,
 }
 
 impl Default for Config {

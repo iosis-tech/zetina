@@ -58,7 +58,7 @@ class Job(Task):
 
 @marshmallow_dataclass.dataclass(frozen=True)
 class SimpleBootloaderInput(ValidatedMarshmallowDataclass):
-    identity: str
+    public_key: List[int]
     job: Job
 
     fact_topologies_path: Optional[str]

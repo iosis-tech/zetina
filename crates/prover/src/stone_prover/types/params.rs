@@ -27,16 +27,16 @@ impl Default for Statement {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Default, Deserialize)]
 pub struct Fri {
-    pub fri_step_list: Vec<u32>,
-    pub last_layer_degree_bound: u32,
-    pub n_queries: u32,
-    pub proof_of_work_bits: u32,
+    pub fri_step_list: Vec<u64>,
+    pub last_layer_degree_bound: u64,
+    pub n_queries: u64,
+    pub proof_of_work_bits: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Default, Deserialize)]
 pub struct Stark {
     pub fri: Fri,
-    pub log_n_cosets: u32,
+    pub log_n_cosets: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ pub struct Params {
     pub field: Field,
     pub channel_hash: Hash,
     pub commitment_hash: Hash,
-    pub n_verifier_friendly_commitment_layers: u32,
+    pub n_verifier_friendly_commitment_layers: u64,
     pub pow_hash: Hash,
     pub statement: Statement,
     pub stark: Stark,
