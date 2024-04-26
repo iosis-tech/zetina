@@ -1,11 +1,10 @@
 use crate::{errors::CompilerControllerError, traits::CompilerController};
 use async_process::Stdio;
 use futures::Future;
-use libsecp256k1::SecretKey;
 use sharp_p2p_common::job::JobData;
 use sharp_p2p_common::layout::Layout;
 use sharp_p2p_common::{job::Job, process::Process};
-use starknet::providers::sequencer::models::L1Address;
+use starknet_crypto::FieldElement;
 use std::path::PathBuf;
 use std::{io::Read, pin::Pin};
 use tempfile::NamedTempFile;
@@ -15,12 +14,13 @@ use tracing::debug;
 pub mod tests;
 
 pub struct CairoCompiler {
-    signing_key: SecretKey,
+    keypair: libp2p::identity::ecdsa::Keypair,
+    registry_contract: FieldElement,
 }
 
 impl CairoCompiler {
-    pub fn new(signing_key: SecretKey) -> Self {
-        Self { signing_key }
+    pub fn new(keypair: libp2p::identity::ecdsa::Keypair, registry_contract: FieldElement) -> Self {
+        Self { keypair, registry_contract }
     }
 }
 
@@ -108,9 +108,9 @@ impl CompilerController for CairoCompiler {
                         reward: 0,       // TODO: calculate this properly
                         num_of_steps: 0, // TODO: calculate this properly
                         cairo_pie_compressed: cairo_pie_bytes,
-                        registry_address: L1Address::random(),
+                        registry_address: self.registry_contract,
                     },
-                    self.signing_key,
+                    self.keypair.clone(),
                 ))
             });
 

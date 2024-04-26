@@ -34,7 +34,8 @@ futures-util = "0.3.30"
 hex = "0.4.3"
 itertools = "0.12.1"
 libp2p = { version = "0.53.2", features = [
-    "secp256k1",
+
+    "ecdsa",
     "tokio",
     "gossipsub",
     "kad",
@@ -45,7 +46,6 @@ libp2p = { version = "0.53.2", features = [
     "yamux",
     "quic",
 ] }
-libsecp256k1 = "0.7.1"
 num-bigint = "0.4.4"
 proptest = "1.4.0"
 proptest-derive = "0.4.0"

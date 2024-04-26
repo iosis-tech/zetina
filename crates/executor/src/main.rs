@@ -1,9 +1,12 @@
 use futures_util::StreamExt;
 use libp2p::gossipsub::Event;
+use sharp_p2p_common::identity::IdentityHandler;
+use sharp_p2p_common::job::Job;
 use sharp_p2p_common::network::Network;
 use sharp_p2p_common::topic::{gossipsub_ident_topic, Topic};
 use sharp_p2p_peer::registry::RegistryHandler;
 use sharp_p2p_peer::swarm::SwarmRunner;
+use starknet::core::types::FieldElement;
 use std::error::Error;
 use tokio::io::{stdin, AsyncBufReadExt, BufReader};
 use tokio::sync::mpsc;
@@ -14,10 +17,15 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> Result<(), Box<dyn Error>> {
     let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
 
-    // 1. Generate keypair for the node
-    let p2p_local_keypair = libp2p::identity::Keypair::generate_secp256k1();
+    // Pass the private key to the IdentityHandler
+    let private_key = FieldElement::from_hex_be(
+        "0139fe4d6f02e666e86a6f58e65060f115cd3c185bd9e98bd829636931458f79",
+    )
+    .unwrap();
+    let identity_handler = IdentityHandler::new(private_key);
+    let p2p_local_keypair = identity_handler.get_keypair();
 
-    // 2. Generate topic
+    // Generate topic
     let new_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);
     let picked_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob);
 
@@ -45,8 +53,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     Event::Message { message, .. } => {
                         // Received a new-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::NewJob).into() {
-
                                 info!("Received a new job: {:?}", message);
+                                let deserialized_job: Job = serde_json::from_slice(&message.data).unwrap();
+                                // TODO: Implement the job execution
+                                println!("{:?}", deserialized_job);
+
                         }
                         // Received a picked-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {

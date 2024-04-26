@@ -10,10 +10,12 @@ license-file.workspace = true
 [dependencies]
 async-process.workspace = true
 cairo-proof-parser.workspace = true
-futures.workspace= true
+futures.workspace = true
 hex.workspace = true
 itertools.workspace = true
-libsecp256k1.workspace = true
+libp2p.workspace = true
+# TODO: yet runner using secp256k1
+libsecp256k1 = "0.7.1"
 rand.workspace = true
 serde_json.workspace = true
 starknet.workspace = true

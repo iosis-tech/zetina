@@ -13,7 +13,6 @@ cairo-felt.workspace = true
 futures.workspace = true
 hex.workspace = true
 libp2p.workspace = true
-libsecp256k1.workspace = true
 num-bigint.workspace = true
 proptest-derive.workspace = true
 proptest.workspace = true

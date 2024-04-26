@@ -22,6 +22,10 @@ impl RegistryHandler {
         Self { provider, contract_address, last_block_number: 0 }
     }
 
+    pub fn get_registry_address(&self) -> FieldElement {
+        self.contract_address
+    }
+
     async fn scrape_event(
         &mut self,
         event_keys: Vec<String>,

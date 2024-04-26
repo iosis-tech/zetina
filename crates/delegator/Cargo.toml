@@ -10,9 +10,11 @@ license-file.workspace = true
 [dependencies]
 futures-util.workspace = true
 libp2p.workspace = true
-libsecp256k1.workspace = true
 sharp-p2p-common.workspace = true
 sharp-p2p-peer.workspace = true
+sharp-p2p-compiler.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
+starknet.workspace = true
+serde_json.workspace = true
