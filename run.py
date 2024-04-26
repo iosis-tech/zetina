@@ -1,4 +1,4 @@
-from install import log_and_run
+from utils import log_and_run
 
 if __name__ == "__main__":
     log_and_run([
