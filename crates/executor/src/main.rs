@@ -1,48 +1,43 @@
 use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
-use sharp_p2p_common::hash;
-use sharp_p2p_common::identity::IdentityHandler;
-use sharp_p2p_common::job::Job;
-use sharp_p2p_common::job_record::JobRecord;
-use sharp_p2p_common::job_trace::JobTrace;
-use sharp_p2p_common::job_witness::JobWitness;
-use sharp_p2p_common::network::Network;
-use sharp_p2p_common::process::Process;
-use sharp_p2p_common::topic::{gossipsub_ident_topic, Topic};
-use sharp_p2p_peer::registry::RegistryHandler;
-use sharp_p2p_peer::swarm::SwarmRunner;
-use sharp_p2p_prover::errors::ProverControllerError;
-use sharp_p2p_prover::stone_prover::StoneProver;
-use sharp_p2p_prover::traits::ProverController;
-use sharp_p2p_runner::cairo_runner::CairoRunner;
-use sharp_p2p_runner::errors::RunnerControllerError;
-use sharp_p2p_runner::traits::RunnerController;
-use starknet::core::types::FieldElement;
-use std::env;
-use std::error::Error;
+use sharp_p2p_common::{
+    hash,
+    job::Job,
+    job_record::JobRecord,
+    job_trace::JobTrace,
+    job_witness::JobWitness,
+    network::Network,
+    process::Process,
+    topic::{gossipsub_ident_topic, Topic},
+};
+use sharp_p2p_peer::{registry::RegistryHandler, swarm::SwarmRunner};
+use sharp_p2p_prover::{
+    errors::ProverControllerError, stone_prover::StoneProver, traits::ProverController,
+};
+use sharp_p2p_runner::{
+    cairo_runner::CairoRunner, errors::RunnerControllerError, traits::RunnerController,
+};
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::PathBuf;
-use tokio::io::{stdin, AsyncBufReadExt, BufReader};
-use tokio::sync::mpsc;
-use tracing::info;
+use tokio::{
+    io::{stdin, AsyncBufReadExt, BufReader},
+    sync::mpsc,
+};
+use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
+const MAX_PARALLEL_JOBS: usize = 2;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
 
-    let ws_root =
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"))
-            .join("../../");
+    let ws_root = std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"),
+    )
+    .join("../../");
     let program_path = ws_root.join("target/bootloader.json");
 
-    // Pass the private key to the IdentityHandler
-    let private_key = FieldElement::from_hex_be(
-        "0139fe4d6f02e666e86a6f58e65060f115cd3c185bd9e98bd829636931458f79",
-    )
-    .unwrap();
-    let identity_handler = IdentityHandler::new(private_key);
-    let p2p_local_keypair = identity_handler.get_keypair();
+    let p2p_local_keypair = libp2p::identity::Keypair::generate_ecdsa();
 
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);
@@ -59,12 +54,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut message_stream = swarm_runner.run(picked_job_topic, send_topic_rx);
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
-    let mut job_record = JobRecord::<Job>::new();
-
-    let identity = identity_handler.get_ecdsa_keypair();
-    let runner = CairoRunner::new(program_path, identity.public());
+    let p2p_local_keypair_ecdsa = p2p_local_keypair.try_into_ecdsa().unwrap();
+    let runner = CairoRunner::new(program_path, p2p_local_keypair_ecdsa.public());
     let prover = StoneProver::new();
 
+    let mut job_record = JobRecord::<Job>::new();
     let mut runner_scheduler =
         FuturesUnordered::<Process<'_, Result<JobTrace, RunnerControllerError>>>::new();
     let mut prover_scheduler =
@@ -84,14 +78,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         // Received a new-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::NewJob).into() {
                             let job: Job = serde_json::from_slice(&message.data).unwrap();
-                            info!("Received a new job: {:?}", hash!(job));
+                            info!("Received a new job event: {}", hash!(&job));
                             job_record.register_job(job);
 
                         }
                         // Received a picked-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {
                             let job: Job = serde_json::from_slice(&message.data).unwrap();
-                            info!("Received picked job event: {:?}", hash!(job));
+                            info!("Received picked job event: {}", hash!(&job));
                             job_record.remove_job(&job);
                         }
                     },
@@ -105,7 +99,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             },
             Some(Ok(event_vec)) = event_stream.next() => {
-                info!("{:?}", event_vec);
+                debug!("{:?}", event_vec);
             },
             Some(Ok(job_trace)) = runner_scheduler.next() => {
                 info!("Scheduled proving of job_trace: {}", hash!(&job_trace));
@@ -117,9 +111,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
             else => break
         };
 
-        if runner_scheduler.is_empty() && prover_scheduler.is_empty() && !job_record.is_empty() {
+        if runner_scheduler.len() < MAX_PARALLEL_JOBS
+            && prover_scheduler.len() < MAX_PARALLEL_JOBS
+            && !job_record.is_empty()
+        {
             let job = job_record.take_job().await.unwrap();
-            info!("Scheduled run of job: {}", hash!(job));
+
+            let serialized_job = serde_json::to_string(&job).unwrap();
+            send_topic_tx.send(serialized_job.into()).await?;
+            info!("Sent picked job event: {}", hash!(&job));
+
+            info!("Scheduled run of job: {}", hash!(&job));
             runner_scheduler.push(runner.run(job).unwrap());
         }
     }
