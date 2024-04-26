@@ -1,16 +1,6 @@
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
-use libsecp256k1::{PublicKey, SecretKey};
-use rand::thread_rng;
-use sharp_p2p_prover::{
-    stone_prover::{
-        types::{
-            config::Config,
-            params::{Fri, Params, Stark},
-        },
-        StoneProver,
-    },
-    traits::ProverController,
-};
+use libp2p::identity::ecdsa::Keypair;
+use sharp_p2p_prover::{stone_prover::StoneProver, traits::ProverController};
 use sharp_p2p_runner::{
     cairo_runner::{tests::models::fixture as runner_fixture, CairoRunner},
     traits::RunnerController,

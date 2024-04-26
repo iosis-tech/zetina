@@ -14,6 +14,8 @@ sharp-p2p-runner.workspace = true
 sharp-p2p-compiler.workspace = true
 tokio.workspace = true
 rand.workspace = true
+libp2p.workspace = true
+starknet-crypto.workspace = true
 
 [features]
 full_test = []
