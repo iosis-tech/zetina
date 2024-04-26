@@ -4,12 +4,19 @@ use sharp_p2p_common::hash;
 use sharp_p2p_common::identity::IdentityHandler;
 use sharp_p2p_common::job::Job;
 use sharp_p2p_common::job_record::JobRecord;
+use sharp_p2p_common::job_trace::JobTrace;
+use sharp_p2p_common::job_witness::JobWitness;
 use sharp_p2p_common::network::Network;
+use sharp_p2p_common::process::Process;
 use sharp_p2p_common::topic::{gossipsub_ident_topic, Topic};
 use sharp_p2p_peer::registry::RegistryHandler;
 use sharp_p2p_peer::swarm::SwarmRunner;
+use sharp_p2p_prover::errors::ProverControllerError;
 use sharp_p2p_prover::stone_prover::StoneProver;
+use sharp_p2p_prover::traits::ProverController;
 use sharp_p2p_runner::cairo_runner::CairoRunner;
+use sharp_p2p_runner::errors::RunnerControllerError;
+use sharp_p2p_runner::traits::RunnerController;
 use starknet::core::types::FieldElement;
 use std::env;
 use std::error::Error;
@@ -53,11 +60,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
     let mut job_record = JobRecord::<Job>::new();
-    // let mut scheduler = FuturesUnordered::new();
 
     let identity = identity_handler.get_ecdsa_keypair();
     let runner = CairoRunner::new(program_path, identity.public());
     let prover = StoneProver::new();
+
+    let mut runner_scheduler =
+        FuturesUnordered::<Process<'_, Result<JobTrace, RunnerControllerError>>>::new();
+    let mut prover_scheduler =
+        FuturesUnordered::<Process<'_, Result<JobWitness, ProverControllerError>>>::new();
 
     // Read full lines from stdin
     let mut stdin = BufReader::new(stdin()).lines();
@@ -96,10 +107,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
             Some(Ok(event_vec)) = event_stream.next() => {
                 info!("{:?}", event_vec);
             },
-            Some(job) = job_record.take_job() => {
-
-            }
+            Some(Ok(job_trace)) = runner_scheduler.next() => {
+                info!("Scheduled proving of job_trace: {}", hash!(&job_trace));
+                prover_scheduler.push(prover.run(job_trace).unwrap());
+            },
+            Some(Ok(job_witness)) = prover_scheduler.next() => {
+                info!("Calculated job_witness: {}", hash!(&job_witness));
+            },
             else => break
+        };
+
+        if runner_scheduler.is_empty() && prover_scheduler.is_empty() && !job_record.is_empty() {
+            let job = job_record.take_job().await.unwrap();
+            info!("Scheduled run of job: {}", hash!(job));
+            runner_scheduler.push(runner.run(job).unwrap());
         }
     }
 

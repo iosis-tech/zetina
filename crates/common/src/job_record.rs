@@ -23,6 +23,10 @@ where
     pub async fn take_job(&mut self) -> Option<J> {
         self.ordered_set.pop_last()
     }
+
+    pub fn is_empty(&mut self) -> bool {
+        self.ordered_set.is_empty()
+    }
 }
 
 impl<J> Default for JobRecord<J>
