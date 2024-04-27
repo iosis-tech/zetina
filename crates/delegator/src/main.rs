@@ -1,5 +1,8 @@
 use futures::StreamExt;
-use libp2p::gossipsub::Event;
+use libp2p::{
+    gossipsub::Event,
+    identity::{ecdsa, Keypair},
+};
 use sharp_p2p_common::{
     hash,
     job::Job,
@@ -23,7 +26,10 @@ use tracing_subscriber::EnvFilter;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
 
-    let p2p_local_keypair = libp2p::identity::Keypair::generate_ecdsa();
+    let private_key =
+        hex::decode("018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f32")?;
+    let p2p_local_keypair =
+        Keypair::from(ecdsa::Keypair::from(ecdsa::SecretKey::try_from_bytes(&private_key)?));
 
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);

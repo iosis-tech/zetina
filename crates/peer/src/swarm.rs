@@ -1,5 +1,5 @@
 use async_stream::stream;
-use futures_core::stream::Stream;
+use futures::stream::Stream;
 use libp2p::futures::StreamExt;
 use libp2p::gossipsub::{self, IdentTopic};
 use libp2p::identity::Keypair;

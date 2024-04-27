@@ -1,5 +1,10 @@
+#![deny(unused_crate_dependencies)]
+
 use futures::{stream::FuturesUnordered, StreamExt};
-use libp2p::gossipsub::Event;
+use libp2p::{
+    gossipsub::Event,
+    identity::{ecdsa, Keypair},
+};
 use sharp_p2p_common::{
     hash,
     job::Job,
@@ -37,7 +42,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .join("../../");
     let program_path = ws_root.join("target/bootloader.json");
 
-    let p2p_local_keypair = libp2p::identity::Keypair::generate_ecdsa();
+    let private_key =
+        hex::decode("07c7a41c77c7a3b19e7c77485854fc88b09ed7041361595920009f81236d55d2")?;
+    let p2p_local_keypair =
+        Keypair::from(ecdsa::Keypair::from(ecdsa::SecretKey::try_from_bytes(&private_key)?));
 
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);
@@ -54,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut message_stream = swarm_runner.run(picked_job_topic, send_topic_rx);
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
-    let p2p_local_keypair_ecdsa = p2p_local_keypair.try_into_ecdsa().unwrap();
+    let p2p_local_keypair_ecdsa = p2p_local_keypair.try_into_ecdsa()?;
     let runner = CairoRunner::new(program_path, p2p_local_keypair_ecdsa.public());
     let prover = StoneProver::new();
 
@@ -77,14 +85,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Event::Message { message, .. } => {
                         // Received a new-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::NewJob).into() {
-                            let job: Job = serde_json::from_slice(&message.data).unwrap();
+                            let job: Job = serde_json::from_slice(&message.data)?;
                             info!("Received a new job event: {}", hash!(&job));
                             job_record.register_job(job);
 
                         }
                         // Received a picked-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {
-                            let job: Job = serde_json::from_slice(&message.data).unwrap();
+                            let job: Job = serde_json::from_slice(&message.data)?;
                             info!("Received picked job event: {}", hash!(&job));
                             job_record.remove_job(&job);
                         }
@@ -103,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Some(Ok(job_trace)) = runner_scheduler.next() => {
                 info!("Scheduled proving of job_trace: {}", hash!(&job_trace));
-                prover_scheduler.push(prover.run(job_trace).unwrap());
+                prover_scheduler.push(prover.run(job_trace)?);
             },
             Some(Ok(job_witness)) = prover_scheduler.next() => {
                 info!("Calculated job_witness: {}", hash!(&job_witness));
@@ -115,14 +123,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             && prover_scheduler.len() < MAX_PARALLEL_JOBS
             && !job_record.is_empty()
         {
-            let job = job_record.take_job().await.unwrap();
+            if let Some(job) = job_record.take_job().await {
+                let serialized_job = serde_json::to_string(&job)?;
+                send_topic_tx.send(serialized_job.into()).await?;
+                info!("Sent picked job event: {}", hash!(&job));
 
-            let serialized_job = serde_json::to_string(&job).unwrap();
-            send_topic_tx.send(serialized_job.into()).await?;
-            info!("Sent picked job event: {}", hash!(&job));
-
-            info!("Scheduled run of job: {}", hash!(&job));
-            runner_scheduler.push(runner.run(job).unwrap());
+                info!("Scheduled run of job: {}", hash!(&job));
+                runner_scheduler.push(runner.run(job)?);
+            }
         }
     }
 

@@ -1,5 +1,5 @@
 use async_stream::try_stream;
-use futures_core::stream::Stream;
+use futures::stream::Stream;
 use starknet::{
     core::types::{BlockId, EmittedEvent, EventFilter, FieldElement},
     providers::{jsonrpc::HttpTransport, JsonRpcClient, Provider, Url},
