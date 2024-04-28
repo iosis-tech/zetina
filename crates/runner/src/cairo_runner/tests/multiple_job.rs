@@ -3,19 +3,15 @@ use crate::{
     traits::RunnerController,
 };
 use futures::{stream::FuturesUnordered, StreamExt};
-use libsecp256k1::{PublicKey, SecretKey};
-use rand::thread_rng;
+use libp2p::identity::ecdsa::Keypair;
 
 #[tokio::test]
 async fn run_multiple_jobs() {
-    let mut rng = thread_rng();
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let runner = CairoRunner::new(
-        fixture1.program_path,
-        PublicKey::from_secret_key(&SecretKey::random(&mut rng)),
-    );
+    let identity = Keypair::generate();
+    let runner = CairoRunner::new(fixture1.program_path, identity.public());
     let mut futures = FuturesUnordered::new();
 
     let job1 = runner.run(fixture1.job).unwrap();
@@ -31,14 +27,11 @@ async fn run_multiple_jobs() {
 
 #[tokio::test]
 async fn abort_multiple_jobs() {
-    let mut rng = thread_rng();
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let runner = CairoRunner::new(
-        fixture1.program_path,
-        PublicKey::from_secret_key(&SecretKey::random(&mut rng)),
-    );
+    let identity = Keypair::generate();
+    let runner = CairoRunner::new(fixture1.program_path, identity.public());
     let mut futures = FuturesUnordered::new();
 
     let job1 = runner.run(fixture1.job).unwrap();

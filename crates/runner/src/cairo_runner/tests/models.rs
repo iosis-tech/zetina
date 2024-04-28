@@ -1,6 +1,7 @@
 use rand::{thread_rng, Rng};
 use sharp_p2p_common::job::{Job, JobData};
-use starknet::providers::sequencer::models::L1Address;
+
+use starknet_crypto::FieldElement;
 use std::{env, fs, path::PathBuf};
 
 pub struct TestFixture {
@@ -22,9 +23,9 @@ pub fn fixture() -> TestFixture {
                 rng.gen(),
                 rng.gen(),
                 fs::read(cairo_pie_path).unwrap(),
-                L1Address::random(),
+                FieldElement::ZERO,
             ),
-            libsecp256k1::SecretKey::random(&mut rng),
+            &libp2p::identity::ecdsa::Keypair::generate(),
         ),
         program_path,
     }

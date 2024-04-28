@@ -1,10 +1,8 @@
 use crate::hash;
-use libsecp256k1::{Message, PublicKey, SecretKey, Signature};
+use libp2p::identity::ecdsa::Keypair;
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use starknet::core::types::FromByteSliceError;
-use starknet::providers::sequencer::models::L1Address;
-use starknet_crypto::{poseidon_hash_many, FieldElement};
+use starknet_crypto::FieldElement;
 use std::{
     fmt::Display,
     hash::{DefaultHasher, Hash, Hasher},
@@ -18,45 +16,36 @@ use std::{
     Additionally, the object holds the signature and public key of the delegator, enabling the executor to prove to the Registry that the task was intended by the delegator.
     The Job object also includes the target registry where the delegator expects this proof to be verified.
 */
-
-#[serde_as]
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub job_data: JobData,
-    #[serde_as(as = "[_; 65]")]
-    pub public_key: [u8; 65], // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
-    #[serde_as(as = "[_; 64]")]
-    pub signature: [u8; 64], // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
+    pub public_key: Vec<u8>, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
+    pub signature: Vec<u8>, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
 }
 
 impl Job {
-    pub fn from_job_data(job_data: JobData, secret_key: SecretKey) -> Self {
-        let felts: Vec<FieldElement> = job_data.to_owned().try_into().unwrap();
-        let message = Message::parse(&poseidon_hash_many(&felts).to_bytes_be());
-        let (signature, _recovery) = libsecp256k1::sign(&message, &secret_key);
-
-        Self {
-            job_data,
-            public_key: PublicKey::from_secret_key(&secret_key).serialize(),
-            signature: signature.serialize(),
-        }
+    pub fn from_job_data(job_data: JobData, key_pair: &Keypair) -> Self {
+        let message: Vec<u8> = job_data.to_owned().try_into().unwrap();
+        let public_key = key_pair.public();
+        let signature = key_pair.sign(&message);
+        Self { job_data, public_key: public_key.to_bytes(), signature }
     }
 
     pub fn verify_signature(&self) -> bool {
-        let felts: Vec<FieldElement> = self.job_data.to_owned().try_into().unwrap();
-        let message = Message::parse(&poseidon_hash_many(&felts).to_bytes_be());
-        let signature = Signature::parse_overflowing(&self.signature);
-        let pubkey = PublicKey::parse(&self.public_key).unwrap();
-        libsecp256k1::verify(&message, &signature, &pubkey)
+        let message: Vec<u8> = self.job_data.to_owned().try_into().unwrap();
+        let public_key =
+            libp2p::identity::ecdsa::PublicKey::try_from_bytes(self.public_key.as_slice()).unwrap();
+        let signature = &self.signature;
+        public_key.verify(&message, signature)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct JobData {
     pub reward: u32,
     pub num_of_steps: u32,
     pub cairo_pie_compressed: Vec<u8>,
-    pub registry_address: L1Address,
+    pub registry_address: FieldElement,
 }
 
 impl JobData {
@@ -64,9 +53,25 @@ impl JobData {
         reward: u32,
         num_of_steps: u32,
         cairo_pie_compressed: Vec<u8>,
-        registry_address: L1Address,
+        registry_address: FieldElement,
     ) -> Self {
         Self { reward, num_of_steps, cairo_pie_compressed, registry_address }
+    }
+}
+
+impl TryFrom<JobData> for Vec<u8> {
+    type Error = FromByteSliceError;
+    fn try_from(value: JobData) -> Result<Self, Self::Error> {
+        let mut felts: Vec<FieldElement> =
+            vec![FieldElement::from(value.reward), FieldElement::from(value.num_of_steps)];
+        felts.extend(
+            value
+                .cairo_pie_compressed
+                .chunks(31)
+                .map(|chunk| FieldElement::from_byte_slice_be(chunk).unwrap()),
+        );
+        felts.push(value.registry_address);
+        Ok(felts.iter().flat_map(|felt| felt.to_bytes_be()).collect())
     }
 }
 
@@ -81,7 +86,7 @@ impl TryFrom<JobData> for Vec<FieldElement> {
                 .chunks(31)
                 .map(|chunk| FieldElement::from_byte_slice_be(chunk).unwrap()),
         );
-        felts.push(FieldElement::from_byte_slice_be(&value.registry_address.to_fixed_bytes())?);
+        felts.push(value.registry_address);
         Ok(felts)
     }
 }

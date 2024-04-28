@@ -1,36 +1,84 @@
-use futures_util::StreamExt;
+#![deny(unused_crate_dependencies)]
+
+use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
-use sharp_p2p_common::network::Network;
-use sharp_p2p_common::topic::{gossipsub_ident_topic, Topic};
-use sharp_p2p_peer::registry::RegistryHandler;
-use sharp_p2p_peer::swarm::SwarmRunner;
-use std::error::Error;
-use tokio::io::{stdin, AsyncBufReadExt, BufReader};
-use tokio::sync::mpsc;
-use tracing::info;
+use sharp_p2p_common::{
+    hash,
+    job::Job,
+    job_record::JobRecord,
+    job_trace::JobTrace,
+    job_witness::JobWitness,
+    network::Network,
+    node_account::NodeAccount,
+    process::Process,
+    topic::{gossipsub_ident_topic, Topic},
+};
+use sharp_p2p_peer::{registry::RegistryHandler, swarm::SwarmRunner};
+use sharp_p2p_prover::{
+    errors::ProverControllerError, stone_prover::StoneProver, traits::ProverController,
+};
+use sharp_p2p_runner::{
+    cairo_runner::CairoRunner, errors::RunnerControllerError, traits::RunnerController,
+};
+use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
+use std::hash::{DefaultHasher, Hash, Hasher};
+use tokio::{
+    io::{stdin, AsyncBufReadExt, BufReader},
+    sync::mpsc,
+};
+use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
+const MAX_PARALLEL_JOBS: usize = 2;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
 
-    // 1. Generate keypair for the node
-    let p2p_local_keypair = libp2p::identity::Keypair::generate_secp256k1();
+    let ws_root = std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"),
+    )
+    .join("../../");
+    let program_path = ws_root.join("target/bootloader.json");
 
-    // 2. Generate topic
-    let new_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);
-    let picked_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob);
+    // TODO: common setup in node initiate binary
+    let network = Network::Sepolia;
+    let private_key =
+        hex::decode("07c7a41c77c7a3b19e7c77485854fc88b09ed7041361595920009f81236d55d2")?;
+    let account_address =
+        hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
+    let url = "https://starknet-sepolia.public.blastapi.io";
+
+    let mut registry_handler =
+        RegistryHandler::new(JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)));
+    let node_account = NodeAccount::new(
+        private_key,
+        account_address,
+        network,
+        JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)),
+    );
+    let p2p_local_keypair = node_account.get_keypair();
+
+    // Generate topic
+    let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
+    let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
 
     let mut swarm_runner =
         SwarmRunner::new(&p2p_local_keypair, &[new_job_topic, picked_job_topic.to_owned()])?;
-    let mut registry_handler = RegistryHandler::new(
-        "https://starknet-sepolia.public.blastapi.io",
-        "0xcdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b",
-    );
 
     let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
     let mut message_stream = swarm_runner.run(picked_job_topic, send_topic_rx);
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
+
+    let p2p_local_keypair_ecdsa = p2p_local_keypair.try_into_ecdsa()?;
+    let runner = CairoRunner::new(program_path, p2p_local_keypair_ecdsa.public());
+    let prover = StoneProver::new();
+
+    let mut job_record = JobRecord::<Job>::new();
+    let mut runner_scheduler =
+        FuturesUnordered::<Process<'_, Result<JobTrace, RunnerControllerError>>>::new();
+    let mut prover_scheduler =
+        FuturesUnordered::<Process<'_, Result<JobWitness, ProverControllerError>>>::new();
 
     // Read full lines from stdin
     let mut stdin = BufReader::new(stdin()).lines();
@@ -45,13 +93,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     Event::Message { message, .. } => {
                         // Received a new-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::NewJob).into() {
+                            let job: Job = serde_json::from_slice(&message.data)?;
+                            info!("Received a new job event: {}", hash!(&job));
+                            job_record.register_job(job);
 
-                                info!("Received a new job: {:?}", message);
                         }
                         // Received a picked-job message from the network
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {
-
-                            info!("Received a picked job: {:?}", message);
+                            let job: Job = serde_json::from_slice(&message.data)?;
+                            info!("Received picked job event: {}", hash!(&job));
+                            job_record.remove_job(&job);
                         }
                     },
                     Event::Subscribed { peer_id, topic } => {
@@ -64,9 +115,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             },
             Some(Ok(event_vec)) = event_stream.next() => {
-                info!("{:?}", event_vec);
+                debug!("{:?}", event_vec);
+            },
+            Some(Ok(job_trace)) = runner_scheduler.next() => {
+                info!("Scheduled proving of job_trace: {}", hash!(&job_trace));
+                prover_scheduler.push(prover.run(job_trace)?);
+            },
+            Some(Ok(job_witness)) = prover_scheduler.next() => {
+                info!("Calculated job_witness: {}", hash!(&job_witness));
             },
             else => break
+        };
+
+        if runner_scheduler.len() < MAX_PARALLEL_JOBS
+            && prover_scheduler.len() < MAX_PARALLEL_JOBS
+            && !job_record.is_empty()
+        {
+            if let Some(job) = job_record.take_job().await {
+                let serialized_job = serde_json::to_string(&job)?;
+                send_topic_tx.send(serialized_job.into()).await?;
+                info!("Sent picked job event: {}", hash!(&job));
+
+                info!("Scheduled run of job: {}", hash!(&job));
+                runner_scheduler.push(runner.run(job)?);
+            }
         }
     }
 

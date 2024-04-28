@@ -5,12 +5,12 @@ overflow-checks = true
 resolver = "2"
 members = [
     "crates/common",
+    "crates/compiler",
     "crates/delegator",
     "crates/executor",
     "crates/peer",
     "crates/prover",
     "crates/runner",
-    "crates/compiler",
     "crates/tests",
 
 ]
@@ -34,7 +34,7 @@ futures-util = "0.3.30"
 hex = "0.4.3"
 itertools = "0.12.1"
 libp2p = { version = "0.53.2", features = [
-    "secp256k1",
+    "ecdsa",
     "tokio",
     "gossipsub",
     "kad",
@@ -45,7 +45,6 @@ libp2p = { version = "0.53.2", features = [
     "yamux",
     "quic",
 ] }
-libsecp256k1 = "0.7.1"
 num-bigint = "0.4.4"
 proptest = "1.4.0"
 proptest-derive = "0.4.0"
@@ -65,10 +64,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 zip-extensions = "0.6.2"
 
 sharp-p2p-common = { path = "crates/common" }
+sharp-p2p-compiler = { path = "crates/compiler" }
 sharp-p2p-delegator = { path = "crates/delegator" }
 sharp-p2p-executor = { path = "crates/executor" }
 sharp-p2p-peer = { path = "crates/peer" }
 sharp-p2p-prover = { path = "crates/prover" }
 sharp-p2p-runner = { path = "crates/runner" }
-sharp-p2p-compiler = { path = "crates/compiler" }
 sharp-p2p-tests = { path = "crates/tests" }

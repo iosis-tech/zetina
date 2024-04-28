@@ -1,5 +1,5 @@
 use async_stream::stream;
-use futures_core::stream::Stream;
+use futures::stream::Stream;
 use libp2p::futures::StreamExt;
 use libp2p::gossipsub::{self, IdentTopic};
 use libp2p::identity::Keypair;
@@ -60,6 +60,7 @@ impl SwarmRunner {
         let config = gossipsub::ConfigBuilder::default()
             .heartbeat_interval(Duration::from_secs(10))
             .validation_mode(gossipsub::ValidationMode::Strict)
+            .max_transmit_size(usize::MAX)
             .build()?;
 
         Ok(gossipsub::Behaviour::new(message_authenticity, config)?)

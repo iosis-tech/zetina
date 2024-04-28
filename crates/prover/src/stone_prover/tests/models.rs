@@ -1,15 +1,9 @@
-use crate::stone_prover::types::{
-    config::Config,
-    params::{Fri, Params, Stark},
-};
 use sharp_p2p_common::job_trace::JobTrace;
 use std::{env, fs, io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
 
 pub struct TestFixture {
     pub job_trace: JobTrace,
-    pub cpu_air_prover_config: Config,
-    pub cpu_air_params: Params,
 }
 
 pub fn fixture() -> TestFixture {
@@ -33,20 +27,5 @@ pub fn fixture() -> TestFixture {
     let mut trace = NamedTempFile::new().unwrap();
     trace.write_all(&fs::read(trace_path).unwrap()).unwrap();
 
-    TestFixture {
-        job_trace: JobTrace { air_public_input, air_private_input, memory, trace },
-        cpu_air_prover_config: Config::default(),
-        cpu_air_params: Params {
-            stark: Stark {
-                fri: Fri {
-                    fri_step_list: vec![0, 4, 4, 3],
-                    last_layer_degree_bound: 128,
-                    n_queries: 1,
-                    proof_of_work_bits: 1,
-                },
-                log_n_cosets: 1,
-            },
-            ..Default::default()
-        },
-    }
+    TestFixture { job_trace: JobTrace { air_public_input, air_private_input, memory, trace } }
 }

@@ -8,13 +8,16 @@ license-file.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+[dev-dependencies]
 futures.workspace = true
+libp2p.workspace = true
+rand.workspace = true
+sharp-p2p-compiler.workspace = true
 sharp-p2p-prover.workspace = true
 sharp-p2p-runner.workspace = true
-sharp-p2p-compiler.workspace = true
+starknet-crypto.workspace = true
 tokio.workspace = true
-libsecp256k1.workspace = true
-rand.workspace = true
 
 [features]
 full_test = []

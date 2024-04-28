@@ -9,7 +9,8 @@ async fn run_multiple_jobs() {
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let compiler = CairoCompiler::new();
+    let identity = Keypair::generate();
+    let compiler = CairoCompiler::new(&identity, FieldElement::ZERO);
     let mut futures = FuturesUnordered::new();
 
     let job1 = compiler.run(fixture1.program_path, fixture1.program_input_path).unwrap();
@@ -28,7 +29,8 @@ async fn abort_multiple_jobs() {
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let runner = CairoCompiler::new();
+    let identity = Keypair::generate();
+    let compiler = CairoCompiler::new(&identity, FieldElement::ZERO);
     let mut futures = FuturesUnordered::new();
 
     let job1 = runner.run(fixture1.program_path, fixture1.program_input_path).unwrap();

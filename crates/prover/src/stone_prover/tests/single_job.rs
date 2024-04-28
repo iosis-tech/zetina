@@ -7,7 +7,7 @@ use crate::{
 async fn run_single_job_trace() {
     let fixture = fixture();
 
-    let prover = StoneProver::new(fixture.cpu_air_prover_config, fixture.cpu_air_params);
+    let prover = StoneProver::new();
     prover.run(fixture.job_trace).unwrap().await.unwrap();
 }
 
@@ -15,7 +15,7 @@ async fn run_single_job_trace() {
 async fn abort_single_job_trace() {
     let fixture = fixture();
 
-    let prover = StoneProver::new(fixture.cpu_air_prover_config, fixture.cpu_air_params);
+    let prover = StoneProver::new();
     let job = prover.run(fixture.job_trace).unwrap();
     job.abort().await.unwrap();
     job.await.unwrap_err();

@@ -16,4 +16,7 @@ pub enum ProverControllerError {
 
     #[error("proof parsing error")]
     ProofParseError(String),
+
+    #[error("could not get number of steps")]
+    NumberOfStepsUnavailable,
 }

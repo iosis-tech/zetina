@@ -9,7 +9,7 @@ async fn run_multiple_job_traces() {
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let prover = StoneProver::new(fixture1.cpu_air_prover_config, fixture1.cpu_air_params);
+    let prover = StoneProver::new();
     let mut futures = FuturesUnordered::new();
 
     let job1 = prover.run(fixture1.job_trace).unwrap();
@@ -28,7 +28,7 @@ async fn abort_multiple_job_traces() {
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let prover = StoneProver::new(fixture1.cpu_air_prover_config, fixture1.cpu_air_params);
+    let prover = StoneProver::new();
     let mut futures = FuturesUnordered::new();
 
     let job1 = prover.run(fixture1.job_trace).unwrap();
