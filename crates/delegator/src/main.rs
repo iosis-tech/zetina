@@ -34,11 +34,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let account_address =
         hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
     let url = "https://starknet-sepolia.public.blastapi.io";
-    let provider = JsonRpcClient::new(HttpTransport::new(Url::parse(url).unwrap()));
-    let mut registry_handler = RegistryHandler::new(provider);
+
+    let mut registry_handler =
+        RegistryHandler::new(JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)));
     let registry_address = registry_handler.get_registry_address();
-    let provider = JsonRpcClient::new(HttpTransport::new(Url::parse(url).unwrap()));
-    let node_account = NodeAccount::new(private_key, account_address, network, provider);
+    let node_account = NodeAccount::new(
+        private_key,
+        account_address,
+        network,
+        JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)),
+    );
     let p2p_local_keypair = node_account.get_keypair();
 
     // Generate topic
