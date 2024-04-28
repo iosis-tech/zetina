@@ -4,4 +4,5 @@ use strum::IntoStaticStr;
 #[strum(serialize_all = "snake_case")]
 pub enum Layout {
     RecursiveWithPoseidon,
+    Starknet,
 }

@@ -1,6 +1,6 @@
-%builtins output pedersen range_check bitwise poseidon
+%builtins output pedersen range_check ecdsa bitwise ec_op poseidon
 
-from bootloader.recursive_with_poseidon.run_simple_bootloader import (
+from bootloader.starknet.run_simple_bootloader import (
     run_simple_bootloader,
 )
 from common.cairo_builtins import HashBuiltin, PoseidonBuiltin
@@ -10,7 +10,9 @@ func main{
     output_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
+    ecdsa_ptr,
     bitwise_ptr,
+    ec_op_ptr,
     poseidon_ptr: PoseidonBuiltin*,
 }() {
     %{

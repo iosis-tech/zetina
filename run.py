@@ -4,7 +4,7 @@ if __name__ == "__main__":
     log_and_run([
         "cairo-run \
         --program=bootloader.json \
-        --layout=recursive_with_poseidon \
+        --layout=starknet \
         --program_input=bootloader_input.json \
         --air_public_input=bootloader_public_input.json \
         --air_private_input=bootloader_private_input.json \

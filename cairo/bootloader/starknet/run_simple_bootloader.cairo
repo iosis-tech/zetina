@@ -1,4 +1,4 @@
-from bootloader.recursive_with_poseidon.execute_task import BuiltinData, execute_task
+from bootloader.starknet.execute_task import BuiltinData, execute_task
 from common.cairo_builtins import HashBuiltin, PoseidonBuiltin
 from common.registers import get_fp_and_pc
 
@@ -14,7 +14,9 @@ func run_simple_bootloader{
     output_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
+    ecdsa_ptr,
     bitwise_ptr,
+    ec_op_ptr,
     poseidon_ptr: PoseidonBuiltin*,
 }() {
     alloc_locals;
@@ -41,7 +43,9 @@ func run_simple_bootloader{
         output=cast(output_ptr, felt),
         pedersen=cast(pedersen_ptr, felt),
         range_check=task_range_check_ptr,
+        ecdsa=ecdsa_ptr,
         bitwise=bitwise_ptr,
+        ec_op=ec_op_ptr,
         poseidon=cast(poseidon_ptr, felt),
     );
 
@@ -50,7 +54,9 @@ func run_simple_bootloader{
         output='output',
         pedersen='pedersen',
         range_check='range_check',
+        ecdsa='ecdsa',
         bitwise='bitwise',
+        ec_op='ec_op',
         poseidon='poseidon',
     );
 
@@ -58,7 +64,9 @@ func run_simple_bootloader{
         output=1,
         pedersen=3,
         range_check=1,
+        ecdsa=2,
         bitwise=5,
+        ec_op=7,
         poseidon=6,
     );
 
@@ -83,7 +91,9 @@ func run_simple_bootloader{
     let output_ptr = cast(builtin_ptrs.output, felt*);
     let pedersen_ptr = cast(builtin_ptrs.pedersen, HashBuiltin*);
     let range_check_ptr = builtin_ptrs.range_check;
+    let ecdsa_ptr = builtin_ptrs.ecdsa;
     let bitwise_ptr = builtin_ptrs.bitwise;
+    let ec_op_ptr = builtin_ptrs.ec_op;
     let poseidon_ptr = cast(builtin_ptrs.poseidon, PoseidonBuiltin*);
 
     // 'execute_tasks' runs untrusted code and uses the range_check builtin to verify that

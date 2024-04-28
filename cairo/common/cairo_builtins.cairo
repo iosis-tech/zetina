@@ -1,6 +1,6 @@
-from starkware.cairo.common.ec_point import EcPoint
-from starkware.cairo.common.keccak_state import KeccakBuiltinState
-from starkware.cairo.common.poseidon_state import PoseidonBuiltinState
+from common.ec_point import EcPoint
+from common.keccak_state import KeccakBuiltinState
+from common.poseidon_state import PoseidonBuiltinState
 
 // Specifies the hash builtin memory structure.
 struct HashBuiltin {
