@@ -3,13 +3,14 @@ use crate::{
     traits::CompilerController,
 };
 use futures::{stream::FuturesUnordered, StreamExt};
+use starknet::signers::SigningKey;
 
 #[tokio::test]
 async fn run_multiple_jobs() {
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let identity = Keypair::generate();
+    let identity = SigningKey::from_random();
     let compiler = CairoCompiler::new(&identity, FieldElement::ZERO);
     let mut futures = FuturesUnordered::new();
 
@@ -29,7 +30,7 @@ async fn abort_multiple_jobs() {
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let identity = Keypair::generate();
+    let identity = SigningKey::from_random();
     let compiler = CairoCompiler::new(&identity, FieldElement::ZERO);
     let mut futures = FuturesUnordered::new();
 

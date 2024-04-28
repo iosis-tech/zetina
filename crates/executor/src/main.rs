@@ -57,21 +57,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         network,
         JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)),
     );
-    let p2p_local_keypair = node_account.get_keypair();
 
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
     let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
 
-    let mut swarm_runner =
-        SwarmRunner::new(&p2p_local_keypair, &[new_job_topic, picked_job_topic.to_owned()])?;
+    let mut swarm_runner = SwarmRunner::new(
+        node_account.get_keypair(),
+        &[new_job_topic, picked_job_topic.to_owned()],
+    )?;
 
     let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
     let mut message_stream = swarm_runner.run(picked_job_topic, send_topic_rx);
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
-    let p2p_local_keypair_ecdsa = p2p_local_keypair.try_into_ecdsa()?;
-    let runner = CairoRunner::new(program_path, p2p_local_keypair_ecdsa.public());
+    let verifying_key = node_account.get_verifying_key();
+    let runner = CairoRunner::new(program_path, &verifying_key);
     let prover = StoneProver::new();
 
     let mut job_record = JobRecord::<Job>::new();

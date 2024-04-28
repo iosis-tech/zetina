@@ -1,6 +1,7 @@
 use rand::{thread_rng, Rng};
 use sharp_p2p_common::job::{Job, JobData};
 
+use starknet::signers::SigningKey;
 use starknet_crypto::FieldElement;
 use std::{env, fs, path::PathBuf};
 
@@ -18,14 +19,14 @@ pub fn fixture() -> TestFixture {
     let program_path = ws_root.join("target/bootloader.json");
 
     TestFixture {
-        job: Job::from_job_data(
+        job: Job::try_from_job_data(
             JobData::new(
                 rng.gen(),
                 rng.gen(),
                 fs::read(cairo_pie_path).unwrap(),
                 FieldElement::ZERO,
             ),
-            &libp2p::identity::ecdsa::Keypair::generate(),
+            &SigningKey::from_random(),
         ),
         program_path,
     }

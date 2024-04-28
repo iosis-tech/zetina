@@ -44,21 +44,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         network,
         JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)),
     );
-    let p2p_local_keypair = node_account.get_keypair();
 
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
     let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
 
-    let mut swarm_runner =
-        SwarmRunner::new(&p2p_local_keypair, &[new_job_topic.to_owned(), picked_job_topic])?;
+    let mut swarm_runner = SwarmRunner::new(
+        node_account.get_keypair(),
+        &[new_job_topic.to_owned(), picked_job_topic],
+    )?;
 
     let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
     let mut message_stream = swarm_runner.run(new_job_topic, send_topic_rx);
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
-    let p2p_local_keypair_ecdsa = p2p_local_keypair.try_into_ecdsa().unwrap();
-    let compiler = CairoCompiler::new(&p2p_local_keypair_ecdsa, registry_address);
+    let compiler = CairoCompiler::new(node_account.get_signing_key(), registry_address);
 
     // Read cairo program path from stdin
     let mut stdin = BufReader::new(stdin()).lines();

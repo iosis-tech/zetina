@@ -1,12 +1,12 @@
 use crate::{errors::CompilerControllerError, traits::CompilerController};
 use async_process::Stdio;
 use futures::Future;
-use libp2p::identity::ecdsa::Keypair;
 use rand::{thread_rng, Rng};
 use serde_json::json;
 use sharp_p2p_common::job::JobData;
 use sharp_p2p_common::layout::Layout;
 use sharp_p2p_common::{job::Job, process::Process};
+use starknet::signers::SigningKey;
 use starknet_crypto::FieldElement;
 use std::io::Write;
 use std::path::PathBuf;
@@ -18,13 +18,13 @@ use tracing::debug;
 pub mod tests;
 
 pub struct CairoCompiler<'identity> {
-    keypair: &'identity Keypair,
+    signing_key: &'identity SigningKey,
     registry_contract: FieldElement,
 }
 
 impl<'identity> CairoCompiler<'identity> {
-    pub fn new(keypair: &'identity Keypair, registry_contract: FieldElement) -> Self {
-        Self { keypair, registry_contract }
+    pub fn new(signing_key: &'identity SigningKey, registry_contract: FieldElement) -> Self {
+        Self { signing_key, registry_contract }
     }
 }
 
@@ -118,14 +118,14 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
                 let mut cairo_pie_bytes = Vec::new();
                 cairo_pie.read_to_end(&mut cairo_pie_bytes)?;
 
-                Ok(Job::from_job_data(
+                Ok(Job::try_from_job_data(
                     JobData {
                         reward: 0,       // TODO: calculate this properly
                         num_of_steps: 0, // TODO: calculate this properly
                         cairo_pie_compressed: cairo_pie_bytes,
                         registry_address: self.registry_contract,
                     },
-                    self.keypair,
+                    self.signing_key,
                 ))
             });
 
