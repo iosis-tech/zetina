@@ -1,12 +1,10 @@
 #![deny(unused_crate_dependencies)]
 
 use futures::{stream::FuturesUnordered, StreamExt};
-use libp2p::{
-    gossipsub::Event,
-    identity::{ecdsa, Keypair},
-};
+use libp2p::gossipsub::Event;
 use sharp_p2p_common::{
     hash,
+    identity::IdentityHandler,
     job::Job,
     job_record::JobRecord,
     job_trace::JobTrace,
@@ -44,8 +42,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let private_key =
         hex::decode("07c7a41c77c7a3b19e7c77485854fc88b09ed7041361595920009f81236d55d2")?;
-    let p2p_local_keypair =
-        Keypair::from(ecdsa::Keypair::from(ecdsa::SecretKey::try_from_bytes(&private_key)?));
+    let identity_handler = IdentityHandler::new(private_key);
+    let p2p_local_keypair = identity_handler.get_keypair();
 
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);
