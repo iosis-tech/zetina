@@ -20,12 +20,7 @@ pub fn fixture() -> TestFixture {
 
     TestFixture {
         job: Job::try_from_job_data(
-            JobData::new(
-                rng.gen(),
-                rng.gen(),
-                fs::read(cairo_pie_path).unwrap(),
-                FieldElement::ZERO,
-            ),
+            JobData::new(rng.gen(), fs::read(cairo_pie_path).unwrap(), FieldElement::ZERO),
             &SigningKey::from_random(),
         ),
         program_path,

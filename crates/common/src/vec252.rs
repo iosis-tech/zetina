@@ -1,8 +1,7 @@
-use std::{ops::Deref, str::FromStr};
-
-use cairo_felt::Felt252;
+use cairo_vm::Felt252;
 use serde::{de::Visitor, Deserialize};
 use serde_json::Value;
+use std::{ops::Deref, str::FromStr};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -79,7 +78,7 @@ impl VecFelt252 {
                 }
                 Value::String(n) => {
                     let n = num_bigint::BigUint::from_str(n)?;
-                    args.push(Felt252::from_bytes_be(&n.to_bytes_be()));
+                    args.push(Felt252::from_bytes_be_slice(&n.to_bytes_be()));
                 }
                 Value::Array(a) => {
                     args.push(Felt252::from(a.len()));

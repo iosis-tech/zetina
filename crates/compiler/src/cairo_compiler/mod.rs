@@ -115,16 +115,11 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
                 }
 
                 // cairo run had finished
-                let mut cairo_pie_bytes = Vec::new();
-                cairo_pie.read_to_end(&mut cairo_pie_bytes)?;
+                let mut cairo_pie_compressed = Vec::new();
+                cairo_pie.read_to_end(&mut cairo_pie_compressed)?;
 
                 Ok(Job::try_from_job_data(
-                    JobData {
-                        reward: 0,       // TODO: calculate this properly
-                        num_of_steps: 0, // TODO: calculate this properly
-                        cairo_pie_compressed: cairo_pie_bytes,
-                        registry_address: self.registry_contract,
-                    },
+                    JobData::new(0, cairo_pie_compressed, self.registry_contract),
                     self.signing_key,
                 ))
             });

@@ -26,8 +26,8 @@ license-file = "LICENSE"
 async-process = "2.2.0"
 async-stream = "0.3.5"
 bincode = "1.3"
-cairo-felt = "0.9.1"
 cairo-proof-parser = { git = "https://github.com/Okm165/cairo-proof-parser", rev = "97a04bbee07330311b38d6f4cecfed3acb237626" }
+cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm.git" }
 futures = "0.3.30"
 futures-core = "0.3.30"
 futures-util = "0.3.30"
@@ -61,7 +61,6 @@ tokio = { version = "1.36", features = ["full"] }
 tokio-util = "0.7.10"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-zip-extensions = "0.6.2"
 
 sharp-p2p-common = { path = "crates/common" }
 sharp-p2p-compiler = { path = "crates/compiler" }

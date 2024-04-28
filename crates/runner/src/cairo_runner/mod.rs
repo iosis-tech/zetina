@@ -41,8 +41,6 @@ impl<'identity> RunnerController for CairoRunner<'identity> {
                 let mut cairo_pie = NamedTempFile::new()?;
                 cairo_pie.write_all(&job.job_data.cairo_pie_compressed)?;
 
-                println!("{}", serde_json::to_string(&job).unwrap());
-
                 let input = SimpleBootloaderInput {
                     public_key: self.verifying_key.scalar(),
                     job,

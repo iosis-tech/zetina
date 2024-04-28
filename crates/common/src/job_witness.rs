@@ -1,5 +1,5 @@
 use crate::hash;
-use cairo_felt::Felt252;
+use cairo_vm::Felt252;
 use std::{
     fmt::Display,
     hash::{DefaultHasher, Hash, Hasher},
