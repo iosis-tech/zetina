@@ -14,8 +14,8 @@ where
     /// Key pair for the p2p network.
     /// This represents the identity of the node in the network.
     p2p_keypair: libp2p::identity::Keypair,
-    /// The signing key for the StarkNet network.
-    /// This is used to sign messages and transactions.
+    /// The account for the StarkNet network.
+    /// This account is used to interact with the Registry contract.
     account: SingleOwnerAccount<P, LocalWallet>,
 }
 
