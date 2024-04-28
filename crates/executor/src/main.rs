@@ -4,12 +4,12 @@ use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
 use sharp_p2p_common::{
     hash,
-    identity::IdentityHandler,
     job::Job,
     job_record::JobRecord,
     job_trace::JobTrace,
     job_witness::JobWitness,
     network::Network,
+    node_account::NodeAccount,
     process::Process,
     topic::{gossipsub_ident_topic, Topic},
 };
@@ -20,6 +20,7 @@ use sharp_p2p_prover::{
 use sharp_p2p_runner::{
     cairo_runner::CairoRunner, errors::RunnerControllerError, traits::RunnerController,
 };
+use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
@@ -40,21 +41,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .join("../../");
     let program_path = ws_root.join("target/bootloader.json");
 
+    // TODO: common setup in node initiate binary
+    let network = Network::Sepolia;
     let private_key =
         hex::decode("07c7a41c77c7a3b19e7c77485854fc88b09ed7041361595920009f81236d55d2")?;
-    let identity_handler = IdentityHandler::new(private_key);
-    let p2p_local_keypair = identity_handler.get_keypair();
+    let account_address =
+        hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
+    let url = "https://starknet-sepolia.public.blastapi.io";
+    let provider = JsonRpcClient::new(HttpTransport::new(Url::parse(url).unwrap()));
+    let mut registry_handler = RegistryHandler::new(provider);
+    let provider = JsonRpcClient::new(HttpTransport::new(Url::parse(url).unwrap()));
+    let node_account = NodeAccount::new(private_key, account_address, network, provider);
+    let p2p_local_keypair = node_account.get_keypair();
 
     // Generate topic
-    let new_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::NewJob);
-    let picked_job_topic = gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob);
+    let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
+    let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
 
     let mut swarm_runner =
         SwarmRunner::new(&p2p_local_keypair, &[new_job_topic, picked_job_topic.to_owned()])?;
-    let mut registry_handler = RegistryHandler::new(
-        "https://starknet-sepolia.public.blastapi.io",
-        "0xcdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b",
-    );
 
     let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
     let mut message_stream = swarm_runner.run(picked_job_topic, send_topic_rx);
