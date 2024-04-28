@@ -29,7 +29,7 @@ use tokio::{
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
-const MAX_PARALLEL_JOBS: usize = 2;
+const MAX_PARALLEL_JOBS: usize = 1;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -128,8 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             else => break
         };
 
-        if runner_scheduler.len() < MAX_PARALLEL_JOBS
-            && prover_scheduler.len() < MAX_PARALLEL_JOBS
+        if runner_scheduler.len() + prover_scheduler.len() < MAX_PARALLEL_JOBS
             && !job_record.is_empty()
         {
             if let Some(job) = job_record.take_job().await {

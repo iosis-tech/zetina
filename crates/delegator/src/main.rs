@@ -1,16 +1,18 @@
 #![deny(unused_crate_dependencies)]
 
-use futures::StreamExt;
+use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
 use sharp_p2p_common::{
     hash,
     job::Job,
     network::Network,
     node_account::NodeAccount,
+    process::Process,
     topic::{gossipsub_ident_topic, Topic},
 };
 use sharp_p2p_compiler::{
-    cairo_compiler::tests::models::fixture, cairo_compiler::CairoCompiler,
+    cairo_compiler::{tests::models::fixture, CairoCompiler},
+    errors::CompilerControllerError,
     traits::CompilerController,
 };
 use sharp_p2p_peer::{registry::RegistryHandler, swarm::SwarmRunner};
@@ -60,6 +62,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let compiler = CairoCompiler::new(node_account.get_signing_key(), registry_address);
 
+    let mut compiler_scheduler =
+        FuturesUnordered::<Process<'_, Result<Job, CompilerControllerError>>>::new();
+
     // Read cairo program path from stdin
     let mut stdin = BufReader::new(stdin()).lines();
 
@@ -68,10 +73,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(Some(_)) = stdin.next_line() => {
                 // TODO: handle fixture better way
                 let fixture = fixture();
-                let job = compiler.run(fixture.program_path, fixture.program_input_path).unwrap().await.unwrap();
-                let serialized_job = serde_json::to_string(&job).unwrap();
-                send_topic_tx.send(serialized_job.into()).await?;
-                info!("Sent a new job: {}", hash!(&job));
+                compiler_scheduler.push(compiler.run(fixture.program_path.clone(), fixture.program_input_path)?);
+                info!("Scheduled compiling program at path: {:?}", fixture.program_path);
+
             },
             Some(event) = message_stream.next() => {
                 match event {
@@ -99,6 +103,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Some(Ok(event_vec)) = event_stream.next() => {
                 debug!("{:?}", event_vec);
+            },
+            Some(Ok(job)) = compiler_scheduler.next() => {
+                let serialized_job = serde_json::to_string(&job).unwrap();
+                send_topic_tx.send(serialized_job.into()).await?;
+                info!("Sent a new job: {}", hash!(&job));
             },
             else => break
         }
