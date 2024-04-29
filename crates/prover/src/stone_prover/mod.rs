@@ -8,7 +8,7 @@ use futures::Future;
 use itertools::{chain, Itertools};
 use serde_json::Value;
 use sharp_p2p_common::{
-    hash, job_trace::JobTrace, job_witness::JobWitness, process::Process, vec252::VecFelt252,
+    argvec::ArgVec, hash, job_trace::JobTrace, job_witness::JobWitness, process::Process,
 };
 use std::{
     fs,
@@ -96,12 +96,12 @@ impl ProverController for StoneProver {
                 let parsed_proof = cairo_proof_parser::parse(raw_proof)
                     .map_err(|e| ProverControllerError::ProofParseError(e.to_string()))?;
 
-                let config: VecFelt252 = serde_json::from_str(&parsed_proof.config.to_string())?;
-                let public_input: VecFelt252 =
+                let config: ArgVec = serde_json::from_str(&parsed_proof.config.to_string())?;
+                let public_input: ArgVec =
                     serde_json::from_str(&parsed_proof.public_input.to_string())?;
-                let unsent_commitment: VecFelt252 =
+                let unsent_commitment: ArgVec =
                     serde_json::from_str(&parsed_proof.unsent_commitment.to_string())?;
-                let witness: VecFelt252 = serde_json::from_str(&parsed_proof.witness.to_string())?;
+                let witness: ArgVec = serde_json::from_str(&parsed_proof.witness.to_string())?;
 
                 let proof = chain!(
                     config.into_iter(),

@@ -1,5 +1,5 @@
 use crate::hash;
-use cairo_felt::Felt252;
+use starknet_crypto::FieldElement;
 use std::{
     fmt::Display,
     hash::{DefaultHasher, Hash, Hasher},
@@ -8,13 +8,13 @@ use std::{
 /*
     Job Witness Object
     This object represents the output from the proving process.
-    It holds a serialized proof as an array of Felt252 objects.
+    It holds a serialized proof as an array of FieldElement objects.
     This serialized proof can be deserialized into a StarkProof object by the verifier to proceed with the verification of the statement.
 */
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct JobWitness {
-    pub proof: Vec<Felt252>, // Serialized proof
+    pub proof: Vec<FieldElement>, // Serialized proof
 }
 
 impl Display for JobWitness {

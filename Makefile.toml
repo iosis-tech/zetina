@@ -49,7 +49,7 @@ script = [
     "docker cp -L ${container_id}:/bin/cpu_air_verifier $HOME/.local/bin",
 ]
 
-[tasks.setup]
+[tasks.install]
 workspace = false
 dependencies = [
     "python-requirements-install",

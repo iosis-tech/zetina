@@ -1,16 +1,18 @@
 #![deny(unused_crate_dependencies)]
 
-use futures::StreamExt;
+use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
 use sharp_p2p_common::{
     hash,
     job::Job,
     network::Network,
     node_account::NodeAccount,
+    process::Process,
     topic::{gossipsub_ident_topic, Topic},
 };
 use sharp_p2p_compiler::{
-    cairo_compiler::tests::models::fixture, cairo_compiler::CairoCompiler,
+    cairo_compiler::{tests::models::fixture, CairoCompiler},
+    errors::CompilerControllerError,
     traits::CompilerController,
 };
 use sharp_p2p_peer::{registry::RegistryHandler, swarm::SwarmRunner};
@@ -44,21 +46,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         network,
         JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)),
     );
-    let p2p_local_keypair = node_account.get_keypair();
 
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
     let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
 
-    let mut swarm_runner =
-        SwarmRunner::new(&p2p_local_keypair, &[new_job_topic.to_owned(), picked_job_topic])?;
+    let mut swarm_runner = SwarmRunner::new(
+        node_account.get_keypair(),
+        &[new_job_topic.to_owned(), picked_job_topic],
+    )?;
 
     let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
     let mut message_stream = swarm_runner.run(new_job_topic, send_topic_rx);
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
-    let p2p_local_keypair_ecdsa = p2p_local_keypair.try_into_ecdsa().unwrap();
-    let compiler = CairoCompiler::new(&p2p_local_keypair_ecdsa, registry_address);
+    let compiler = CairoCompiler::new(node_account.get_signing_key(), registry_address);
+
+    let mut compiler_scheduler =
+        FuturesUnordered::<Process<'_, Result<Job, CompilerControllerError>>>::new();
 
     // Read cairo program path from stdin
     let mut stdin = BufReader::new(stdin()).lines();
@@ -68,10 +73,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(Some(_)) = stdin.next_line() => {
                 // TODO: handle fixture better way
                 let fixture = fixture();
-                let job = compiler.run(fixture.program_path, fixture.program_input_path).unwrap().await.unwrap();
-                let serialized_job = serde_json::to_string(&job).unwrap();
-                send_topic_tx.send(serialized_job.into()).await?;
-                info!("Sent a new job: {}", hash!(&job));
+                compiler_scheduler.push(compiler.run(fixture.program_path.clone(), fixture.program_input_path)?);
+                info!("Scheduled compiling program at path: {:?}", fixture.program_path);
+
             },
             Some(event) = message_stream.next() => {
                 match event {
@@ -99,6 +103,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Some(Ok(event_vec)) = event_stream.next() => {
                 debug!("{:?}", event_vec);
+            },
+            Some(Ok(job)) = compiler_scheduler.next() => {
+                let serialized_job = serde_json::to_string(&job).unwrap();
+                send_topic_tx.send(serialized_job.into()).await?;
+                info!("Sent a new job: {}", hash!(&job));
             },
             else => break
         }

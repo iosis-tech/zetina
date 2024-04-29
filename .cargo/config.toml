@@ -1,5 +1,5 @@
 [env]
 RUST_LOG = "info"
 CAIRO_PATH = "cairo"
-BOOTLOADER_PATH = "bootloader/recursive_with_poseidon/simple_bootloader.cairo"
+BOOTLOADER_PATH = "bootloader/starknet/simple_bootloader.cairo"
 BOOTLOADER_OUT_NAME = "bootloader.json"

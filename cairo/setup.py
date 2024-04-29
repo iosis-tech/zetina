@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="sharp_p2p_bootloader",
-    version="0.1",
+    version="0.3",
     description="sharp_p2p bootloader",
     url="#",
     author="Okm165",
@@ -14,6 +14,6 @@ setuptools.setup(
         "common.builtin_poseidon": ["*.cairo", "*/*.cairo"],
         "lang.compiler": ["cairo.ebnf", "lib/*.cairo"],
         "bootloader": ["*.cairo", "*/*.cairo"],
-        "bootloader.recursive_with_poseidon": ["*.cairo", "*/*.cairo"],
+        "bootloader.starknet": ["*.cairo", "*/*.cairo"],
     }
 )

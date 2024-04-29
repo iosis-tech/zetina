@@ -2,9 +2,11 @@ from builtin_selection.inner_select_builtins import inner_select_builtins
 from builtin_selection.select_input_builtins import select_input_builtins
 from builtin_selection.validate_builtins import validate_builtins
 from common.builtin_poseidon.poseidon import PoseidonBuiltin, poseidon_hash_many
-from common.cairo_builtins import HashBuiltin
+from common.cairo_builtins import HashBuiltin, EcOpBuiltin
 from common.hash_chain import hash_chain
+from common.bool import TRUE
 from common.registers import get_ap, get_fp_and_pc
+from common.signature import check_ecdsa_signature
 
 const BOOTLOADER_VERSION = 0;
 
@@ -28,7 +30,9 @@ struct BuiltinData {
     output: felt,
     pedersen: felt,
     range_check: felt,
+    ecdsa: felt,
     bitwise: felt,
+    ec_op: felt,
     poseidon: felt,
 }
 
@@ -109,6 +113,21 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
             use_poseidon=bool(ids.use_poseidon)), 'Computed hash does not match input.'
     %}
 
+    local public_key: felt;
+    local signature_r: felt;
+    local signature_s: felt;
+    %{
+        ids.public_key = simple_bootloader_input.job.public_key
+        ids.signature_r = simple_bootloader_input.job.signature_r
+        ids.signature_s = simple_bootloader_input.job.signature_s
+    %}
+
+    let ec_op_ptr = cast(input_builtin_ptrs.ec_op, EcOpBuiltin*);
+    with ec_op_ptr {
+        let (res) = check_ecdsa_signature(message=hash, public_key=public_key, signature_r=signature_r, signature_s=signature_s);
+        assert res = TRUE;
+    }
+
     // Set the program entry point, so the bootloader can later run the program.
     local builtin_list: felt* = &program_header.builtin_list;
     local n_builtins = program_header.n_builtins;
@@ -127,7 +146,9 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
         output=output_ptr + 2,
         pedersen=cast(pedersen_ptr, felt),
         range_check=input_builtin_ptrs.range_check,
+        ecdsa=input_builtin_ptrs.ecdsa,
         bitwise=input_builtin_ptrs.bitwise,
+        ec_op=cast(ec_op_ptr, felt),
         poseidon=cast(poseidon_ptr, felt),
     );
 
