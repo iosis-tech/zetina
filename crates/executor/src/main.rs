@@ -9,11 +9,10 @@ use sharp_p2p_common::{
     job_trace::JobTrace,
     job_witness::JobWitness,
     network::Network,
-    node_account::NodeAccount,
     process::Process,
     topic::{gossipsub_ident_topic, Topic},
 };
-use sharp_p2p_peer::{registry::RegistryHandler, swarm::SwarmRunner};
+use sharp_p2p_peer::{node_account::NodeAccount, registry::RegistryHandler, swarm::SwarmRunner};
 use sharp_p2p_prover::{
     errors::ProverControllerError, stone_prover::StoneProver, traits::ProverController,
 };

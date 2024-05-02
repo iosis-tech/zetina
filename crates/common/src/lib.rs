@@ -6,7 +6,6 @@ pub mod job_witness;
 pub mod layout;
 pub mod macros;
 pub mod network;
-pub mod node_account;
 pub mod process;
 pub mod topic;
 

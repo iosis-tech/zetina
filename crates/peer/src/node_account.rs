@@ -1,11 +1,15 @@
+use std::error::Error;
+
+use crypto_bigint::U256;
+use sharp_p2p_common::network::Network;
 use starknet::{
-    accounts::{ConnectedAccount, ExecutionEncoding, SingleOwnerAccount},
-    core::types::FieldElement,
+    accounts::{Account, Call, ConnectedAccount, ExecutionEncoding, SingleOwnerAccount},
+    core::types::{BlockId, BlockTag, FieldElement, FunctionCall},
+    macros::selector,
     providers::Provider,
     signers::{LocalWallet, SigningKey, VerifyingKey},
 };
-
-use crate::network::Network;
+use tracing::trace;
 
 pub struct NodeAccount<P>
 where
@@ -61,5 +65,48 @@ where
 
     pub fn get_verifying_key(&self) -> VerifyingKey {
         self.signing_key.verifying_key()
+    }
+
+    pub async fn deposit(
+        &self,
+        amount: FieldElement,
+        registry_address: FieldElement,
+    ) -> Result<(), Box<dyn Error>> {
+        let result = self
+            .account
+            .execute(vec![Call {
+                to: registry_address,
+                selector: selector!("deposit"),
+                calldata: vec![amount],
+            }])
+            .send()
+            .await
+            .unwrap();
+
+        trace!("Deposit result: {:?}", result);
+        Ok(())
+    }
+
+    pub async fn balance(&self, registry_address: FieldElement) -> Result<U256, Box<dyn Error>> {
+        let account_address = self.account.address();
+        let call_result = self
+            .get_provider()
+            .call(
+                FunctionCall {
+                    contract_address: registry_address,
+                    entry_point_selector: selector!("balance"),
+                    calldata: vec![account_address],
+                },
+                BlockId::Tag(BlockTag::Latest),
+            )
+            .await
+            .expect("failed to call contract");
+
+        let low: u128 = call_result[0].try_into().unwrap();
+        let high: u128 = call_result[1].try_into().unwrap();
+        let call_result = U256::from(high << 128 | low);
+        trace!("Balance result: {:?}", call_result);
+
+        Ok(call_result)
     }
 }
