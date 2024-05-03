@@ -23,20 +23,13 @@ func run_simple_bootloader{
     local task_range_check_ptr;
 
     %{
-        n_tasks = 1
-        memory[ids.output_ptr] = n_tasks
-
         # Task range checks are located right after simple bootloader validation range checks, and
         # this is validated later in this function.
-        ids.task_range_check_ptr = ids.range_check_ptr + ids.BuiltinData.SIZE * n_tasks
-
+        ids.task_range_check_ptr = ids.range_check_ptr + ids.BuiltinData.SIZE 
         # A list of fact_toplogies that instruct how to generate the fact from the program output
         # for each task.
         fact_topologies = []
     %}
-
-    let n_tasks = [output_ptr];
-    let output_ptr = output_ptr + 1;
 
     // A struct containing the pointer to each builtin.
     local builtin_ptrs_before: BuiltinData = BuiltinData(
@@ -76,10 +69,9 @@ func run_simple_bootloader{
     let builtin_ptrs = &builtin_ptrs_before;
     let self_range_check_ptr = range_check_ptr;
     with builtin_ptrs, self_range_check_ptr {
-        execute_tasks(
+        execute(
             builtin_encodings=&builtin_encodings,
             builtin_instance_sizes=&builtin_instance_sizes,
-            n_tasks=n_tasks,
         );
     }
 
@@ -138,14 +130,16 @@ func verify_non_negative(num: felt, n_bits: felt) {
 // self_range_check_ptr - range_check pointer (used for validating the builtins).
 //
 // Hint arguments:
-// tasks - A list of tasks to execute.
-func execute_tasks{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
-    builtin_encodings: BuiltinData*, builtin_instance_sizes: BuiltinData*, n_tasks: felt
+// job - A job to execute.
+func execute{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
+    builtin_encodings: BuiltinData*, builtin_instance_sizes: BuiltinData*
 ) {
-    if (n_tasks == 0) {
-        return ();
-    }
+    // Allocate memory for local variables.
+    alloc_locals;
 
+    // Get the value of fp.
+    let (local __fp__, _) = get_fp_and_pc();
+    
     %{
         from bootloader.objects import Task
 
@@ -160,9 +154,34 @@ func execute_tasks{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
         use_poseidon=use_poseidon,
     );
 
-    return execute_tasks(
-        builtin_encodings=builtin_encodings,
-        builtin_instance_sizes=builtin_instance_sizes,
-        n_tasks=n_tasks - 1,
+    local reward: felt;
+    local num_of_steps: felt;
+    local executor: felt;
+    local delegator: felt;
+
+    %{
+        ids.reward = simple_bootloader_input.job.job_data.reward
+        ids.num_of_steps = simple_bootloader_input.job.job_data.num_of_steps
+        ids.executor = simple_bootloader_input.public_key
+        ids.delegator = simple_bootloader_input.job.public_key
+    %}
+
+    assert [builtin_ptrs.output + 0] = reward;
+    assert [builtin_ptrs.output + 1] = num_of_steps;
+    assert [builtin_ptrs.output + 2] = executor;
+    assert [builtin_ptrs.output + 3] = delegator;
+
+    local return_builtin_ptrs: BuiltinData = BuiltinData(
+        output=builtin_ptrs.output + 4,
+        pedersen=builtin_ptrs.pedersen,
+        range_check=builtin_ptrs.range_check,
+        ecdsa=builtin_ptrs.ecdsa,
+        bitwise=builtin_ptrs.bitwise,
+        ec_op=builtin_ptrs.ec_op,
+        poseidon=builtin_ptrs.poseidon,
     );
+
+    let builtin_ptrs = &return_builtin_ptrs;
+
+    return ();
 }
