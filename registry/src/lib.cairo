@@ -31,6 +31,8 @@ pub mod SharpP2PRegistry {
     use super::{IFactRegistryDispatcher, IFactRegistryDispatcherImpl};
     use starknet::{get_caller_address, get_contract_address};
 
+    const FEE_DIVISOR: u256 = 0xffffffffffffffffffffffffffffffff_u256;
+
     #[storage]
     struct Storage {
         token: IERC20Dispatcher,
@@ -92,16 +94,16 @@ pub mod SharpP2PRegistry {
             let caller = get_caller_address();
             let this_contract = get_contract_address();
             self.token.read().transfer_from(caller, this_contract, amount);
-            let prev = self.balances.read(caller);
-            self.balances.write(caller, prev + amount);
+            let prev_balance = self.balances.read(caller);
+            self.balances.write(caller, prev_balance + amount);
             self.emit(Deposit { user: caller, amount: amount });
         }
 
         fn withdraw(ref self: ContractState, amount: u256) {
             let caller = get_caller_address();
             self.token.read().transfer(caller, amount);
-            let prev = self.balances.read(caller);
-            self.balances.write(caller, prev - amount);
+            let prev_balance = self.balances.read(caller);
+            self.balances.write(caller, prev_balance - amount);
             self.emit(Withdraw { user: caller, amount: amount });
         }
 
@@ -110,16 +112,16 @@ pub mod SharpP2PRegistry {
         }
 
         fn verify_job_witness(ref self: ContractState, proof: StarkProofWithSerde) {
-            let metadata = _get_metadata(@proof.public_input);
+            let metadata = get_metadata(@proof.public_input);
 
             self.verifier.read().verify_and_register_fact(proof);
 
-            let fee = _calculate_fee(metadata.reward, self.fee_factor.read());
-            self
-                .token
-                .read()
-                .transfer_from(metadata.delegator, metadata.executor, metadata.reward - fee);
-            self.token.read().transfer_from(metadata.delegator, self.fee_account.read(), fee);
+            let fee = metadata.reward * self.fee_factor.read() / FEE_DIVISOR;
+            let remaining_reward = metadata.reward - fee;
+
+            let token = self.token.read();
+            token.transfer_from(metadata.delegator, metadata.executor, remaining_reward);
+            token.transfer_from(metadata.delegator, self.fee_account.read(), fee);
 
             self
                 .emit(
@@ -133,7 +135,7 @@ pub mod SharpP2PRegistry {
         }
     }
 
-    pub fn _get_metadata(public_input: @PublicInputWithSerde) -> WitnessMetadata {
+    pub fn get_metadata(public_input: @PublicInputWithSerde) -> WitnessMetadata {
         let main_page = public_input.main_page.span();
         let main_page_len = main_page.len();
         WitnessMetadata {
@@ -142,14 +144,5 @@ pub mod SharpP2PRegistry {
             executor: (*main_page.at(main_page_len - 3)).try_into().unwrap(),
             delegator: (*main_page.at(main_page_len - 1)).try_into().unwrap(),
         }
-    }
-
-    fn _calculate_fee(amount: u256, fee_factor: u256) -> u256 {
-        amount
-            * fee_factor
-            / u256 {
-                low: 0xffffffffffffffffffffffffffffffff_u128,
-                high: 0xffffffffffffffffffffffffffffffff_u128
-            }
     }
 }
