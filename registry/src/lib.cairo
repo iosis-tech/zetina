@@ -19,7 +19,7 @@ pub trait IFactRegistry<TContractState> {
 }
 
 #[starknet::contract]
-mod SharpP2PRegistry {
+pub mod SharpP2PRegistry {
     use registry::ISharpP2PRegistry;
     use openzeppelin::token::erc20::interface::IERC20DispatcherTrait;
     use cairo_verifier::{
@@ -77,13 +77,13 @@ mod SharpP2PRegistry {
     }
 
     #[derive(Drop, starknet::Event)]
-    struct WitnessMetadata {
-        reward: u256,
-        num_of_steps: u256,
+    pub struct WitnessMetadata {
+        pub reward: u256,
+        pub num_of_steps: u256,
         #[key]
-        executor: ContractAddress,
+        pub executor: ContractAddress,
         #[key]
-        delegator: ContractAddress,
+        pub delegator: ContractAddress,
     }
 
     #[abi(embed_v0)]
@@ -133,12 +133,14 @@ mod SharpP2PRegistry {
         }
     }
 
-    fn _get_metadata(public_input: @PublicInputWithSerde) -> WitnessMetadata {
+    pub fn _get_metadata(public_input: @PublicInputWithSerde) -> WitnessMetadata {
+        let main_page = public_input.main_page.span();
+        let main_page_len = main_page.len();
         WitnessMetadata {
-            reward: 0x0,
-            num_of_steps: 0x0,
-            executor: 0x0.try_into().unwrap(),
-            delegator: 0x0.try_into().unwrap(),
+            reward: (*main_page.at(main_page_len - 7)).into(),
+            num_of_steps: (*main_page.at(main_page_len - 5)).into(),
+            executor: (*main_page.at(main_page_len - 3)).try_into().unwrap(),
+            delegator: (*main_page.at(main_page_len - 1)).try_into().unwrap(),
         }
     }
 
