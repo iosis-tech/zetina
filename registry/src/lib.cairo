@@ -3,9 +3,9 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait ISharpP2PRegistry<TContractState> {
-    // fn deposit(ref self: TContractState, amount: u256);
-    // fn withdraw(ref self: TContractState, amount: u256);
-    // fn balance(self: @TContractState, account: ContractAddress) -> u256;
+    fn deposit(ref self: TContractState, amount: u256);
+    fn withdraw(ref self: TContractState, amount: u256);
+    fn balance(self: @TContractState, account: ContractAddress) -> u256;
     fn verify_job_witness(ref self: TContractState, proof: StarkProofWithSerde);
 }
 
@@ -20,6 +20,8 @@ pub trait IFactRegistry<TContractState> {
 
 #[starknet::contract]
 mod SharpP2PRegistry {
+    use registry::ISharpP2PRegistry;
+    use openzeppelin::token::erc20::interface::IERC20DispatcherTrait;
     use cairo_verifier::{
         StarkProofWithSerde, air::public_input::PublicInput,
         deserialization::stark::PublicInputWithSerde
@@ -27,6 +29,7 @@ mod SharpP2PRegistry {
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherImpl};
     use starknet::ContractAddress;
     use super::{IFactRegistryDispatcher, IFactRegistryDispatcherImpl};
+    use starknet::{get_caller_address, get_contract_address};
 
     #[storage]
     struct Storage {
@@ -85,9 +88,27 @@ mod SharpP2PRegistry {
 
     #[abi(embed_v0)]
     impl SharpP2PRegistryImpl of super::ISharpP2PRegistry<ContractState> {
-        // fn deposit(ref self: ContractState, amount: u256) {}
-        // fn withdraw(ref self: ContractState, amount: u256) {}
-        // fn balance(self: @ContractState, account: ContractAddress) -> u256 {}
+        fn deposit(ref self: ContractState, amount: u256) {
+            let caller = get_caller_address();
+            let this_contract = get_contract_address();
+            self.token.read().transfer_from(caller, this_contract, amount);
+            let prev = self.balances.read(caller);
+            self.balances.write(caller, prev + amount);
+            self.emit(Deposit { user: caller, amount: amount });
+        }
+
+        fn withdraw(ref self: ContractState, amount: u256) {
+            let caller = get_caller_address();
+            self.token.read().transfer(caller, amount);
+            let prev = self.balances.read(caller);
+            self.balances.write(caller, prev - amount);
+            self.emit(Withdraw { user: caller, amount: amount });
+        }
+
+        fn balance(self: @ContractState, account: ContractAddress) -> u256 {
+            self.balances.read(account)
+        }
+
         fn verify_job_witness(ref self: ContractState, proof: StarkProofWithSerde) {
             let metadata = _get_metadata(@proof.public_input);
 
@@ -99,6 +120,16 @@ mod SharpP2PRegistry {
                 .read()
                 .transfer_from(metadata.delegator, metadata.executor, metadata.reward - fee);
             self.token.read().transfer_from(metadata.delegator, self.fee_account.read(), fee);
+
+            self
+                .emit(
+                    WitnessMetadata {
+                        reward: metadata.reward,
+                        num_of_steps: metadata.num_of_steps,
+                        executor: metadata.executor,
+                        delegator: metadata.delegator,
+                    }
+                );
         }
     }
 
