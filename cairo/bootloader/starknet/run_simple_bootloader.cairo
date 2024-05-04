@@ -54,13 +54,7 @@ func run_simple_bootloader{
     );
 
     local builtin_instance_sizes: BuiltinData = BuiltinData(
-        output=1,
-        pedersen=3,
-        range_check=1,
-        ecdsa=2,
-        bitwise=5,
-        ec_op=7,
-        poseidon=6,
+        output=1, pedersen=3, range_check=1, ecdsa=2, bitwise=5, ec_op=7, poseidon=6
     );
 
     // Call execute_tasks.
@@ -70,8 +64,7 @@ func run_simple_bootloader{
     let self_range_check_ptr = range_check_ptr;
     with builtin_ptrs, self_range_check_ptr {
         execute(
-            builtin_encodings=&builtin_encodings,
-            builtin_instance_sizes=&builtin_instance_sizes,
+            builtin_encodings=&builtin_encodings, builtin_instance_sizes=&builtin_instance_sizes
         );
     }
 
@@ -139,7 +132,7 @@ func execute{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
 
     // Get the value of fp.
     let (local __fp__, _) = get_fp_and_pc();
-    
+
     %{
         from bootloader.objects import Task
 

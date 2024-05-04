@@ -124,7 +124,9 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
 
     let ec_op_ptr = cast(input_builtin_ptrs.ec_op, EcOpBuiltin*);
     with ec_op_ptr {
-        let (res) = check_ecdsa_signature(message=hash, public_key=public_key, signature_r=signature_r, signature_s=signature_s);
+        let (res) = check_ecdsa_signature(
+            message=hash, public_key=public_key, signature_r=signature_r, signature_s=signature_s
+        );
         assert res = TRUE;
     }
 
@@ -174,7 +176,7 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
         assert isinstance(task, Task)
         n_builtins = len(task.get_program().builtins)
         new_task_locals = {}
-        
+
         if isinstance(task, CairoPieTask):
             ret_pc = ids.ret_pc_label.instruction_offset_ - ids.call_task.instruction_offset_ + pc
             load_cairo_pie(
@@ -207,7 +209,7 @@ func execute_task{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
     // Allocate a struct containing all builtin pointers just after the program returns.
     local return_builtin_ptrs: BuiltinData;
     %{
-        from bootloader.recursive_with_poseidon.builtins import ALL_BUILTINS
+        from bootloader.starknet.builtins import ALL_BUILTINS
         from bootloader.utils import write_return_builtins
 
         # Fill the values of all builtin pointers after executing the task.

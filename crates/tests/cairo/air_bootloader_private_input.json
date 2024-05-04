@@ -1,6 +1,6 @@
 {
-    "trace_path": "/home/bartosz/workshop/iosis/sharp-p2p/bootloader.trace",
-    "memory_path": "/home/bartosz/workshop/iosis/sharp-p2p/bootloader.memory",
+    "trace_path": "../tests/cairo/bootloader.trace",
+    "memory_path": "../tests/cairo/bootloader.memory",
     "pedersen": [],
     "range_check": [
         {

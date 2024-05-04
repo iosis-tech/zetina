@@ -1,10 +1,30 @@
 [env]
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = true
 
-[tasks.format]
+[tasks.rust-format]
+workspace = false
 install_crate = "rustfmt"
 command = "cargo"
-args = ["fmt", "--", "--emit=files"]
+args = ["fmt"]
+
+[tasks.scarb-format]
+workspace = false
+command = "scarb"
+args = ["fmt"]
+
+[tasks.cairo-format]
+workspace = false
+script = [
+    "find cairo -name '*.cairo' ! -path 'cairo/build/*' -exec sh -c 'cairo-format -i \"$1\"; echo \"Formatted: $1\"' _ {} \\;"
+]
+
+[tasks.full-format]
+workspace = false
+dependencies = [
+    "rust-format",
+    "scarb-format",
+    "cairo-format",
+]
 
 [tasks.clean]
 command = "cargo"

@@ -31,7 +31,11 @@ pub mod SharpP2PRegistry {
     use super::{IFactRegistryDispatcher, IFactRegistryDispatcherImpl};
     use starknet::{get_caller_address, get_contract_address};
 
-    const FEE_DIVISOR: u256 = 0xffffffffffffffffffffffffffffffff_u256;
+    const FEE_DIVISOR: u256 = 0xffffffffffffffffffffffffffffffff;
+    const REWARD_PUBLIC_MEMORY_OFFSET: u32 = 7;
+    const NUM_OF_STEPS_PUBLIC_MEMORY_OFFSET: u32 = 5;
+    const EXECUTOR_PUBLIC_MEMORY_OFFSET: u32 = 3;
+    const DELEGATOR_PUBLIC_MEMORY_OFFSET: u32 = 1;
 
     #[storage]
     struct Storage {
@@ -139,10 +143,14 @@ pub mod SharpP2PRegistry {
         let main_page = public_input.main_page.span();
         let main_page_len = main_page.len();
         WitnessMetadata {
-            reward: (*main_page.at(main_page_len - 7)).into(),
-            num_of_steps: (*main_page.at(main_page_len - 5)).into(),
-            executor: (*main_page.at(main_page_len - 3)).try_into().unwrap(),
-            delegator: (*main_page.at(main_page_len - 1)).try_into().unwrap(),
+            reward: (*main_page.at(main_page_len - REWARD_PUBLIC_MEMORY_OFFSET)).into(),
+            num_of_steps: (*main_page.at(main_page_len - NUM_OF_STEPS_PUBLIC_MEMORY_OFFSET)).into(),
+            executor: (*main_page.at(main_page_len - EXECUTOR_PUBLIC_MEMORY_OFFSET))
+                .try_into()
+                .unwrap(),
+            delegator: (*main_page.at(main_page_len - DELEGATOR_PUBLIC_MEMORY_OFFSET))
+                .try_into()
+                .unwrap(),
         }
     }
 }
