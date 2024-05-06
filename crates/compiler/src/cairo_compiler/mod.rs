@@ -3,11 +3,8 @@ use async_process::Stdio;
 use futures::Future;
 use rand::{thread_rng, Rng};
 use serde_json::json;
-use sharp_p2p_common::job::JobData;
 use sharp_p2p_common::layout::Layout;
-use sharp_p2p_common::{job::Job, process::Process};
-use starknet::signers::SigningKey;
-use starknet_crypto::FieldElement;
+use sharp_p2p_common::process::Process;
 use std::io::Write;
 use std::path::PathBuf;
 use std::{io::Read, pin::Pin};
@@ -17,25 +14,33 @@ use tracing::debug;
 
 pub mod tests;
 
-pub struct CairoCompiler<'identity> {
-    signing_key: &'identity SigningKey,
-    registry_contract: FieldElement,
-}
+/*
+    Cairo Compiler
+    This object is responsible for compiling the cairo program and generating the PIE.
+    It compiles the cairo program and generates the PIE.
+*/
+pub struct CairoCompiler {}
 
-impl<'identity> CairoCompiler<'identity> {
-    pub fn new(signing_key: &'identity SigningKey, registry_contract: FieldElement) -> Self {
-        Self { signing_key, registry_contract }
+impl CairoCompiler {
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
-impl<'identity> CompilerController for CairoCompiler<'identity> {
+impl Default for CairoCompiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CompilerController for CairoCompiler {
     fn run(
         &self,
         program_path: PathBuf,
         _program_input_path: PathBuf,
-    ) -> Result<Process<Result<Job, CompilerControllerError>>, CompilerControllerError> {
+    ) -> Result<Process<Result<Vec<u8>, CompilerControllerError>>, CompilerControllerError> {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
-        let future: Pin<Box<dyn Future<Output = Result<Job, CompilerControllerError>> + '_>> =
+        let future: Pin<Box<dyn Future<Output = Result<Vec<u8>, CompilerControllerError>> + '_>> =
             Box::pin(async move {
                 let layout: &str = Layout::RecursiveWithPoseidon.into();
 
@@ -118,10 +123,7 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
                 let mut cairo_pie_compressed = Vec::new();
                 cairo_pie.read_to_end(&mut cairo_pie_compressed)?;
 
-                Ok(Job::try_from_job_data(
-                    JobData::new(0, cairo_pie_compressed, self.registry_contract),
-                    self.signing_key,
-                ))
+                Ok(cairo_pie_compressed)
             });
 
         Ok(Process::new(future, terminate_tx))

@@ -9,11 +9,10 @@ use sharp_p2p_common::{
     job_trace::JobTrace,
     job_witness::JobWitness,
     network::Network,
-    node_account::NodeAccount,
     process::Process,
     topic::{gossipsub_ident_topic, Topic},
 };
-use sharp_p2p_peer::{registry::RegistryHandler, swarm::SwarmRunner};
+use sharp_p2p_peer::{node_account::NodeAccount, registry::RegistryHandler, swarm::SwarmRunner};
 use sharp_p2p_prover::{
     errors::ProverControllerError, stone_prover::StoneProver, traits::ProverController,
 };
@@ -51,6 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut registry_handler =
         RegistryHandler::new(JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)));
+    let registry_address = registry_handler.get_registry_address();
     let node_account = NodeAccount::new(
         private_key,
         account_address,
@@ -69,6 +69,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
     let mut message_stream = swarm_runner.run(picked_job_topic, send_topic_rx);
+    // TODO: Subscribe to `WitnessMetadata` event
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
     let verifying_key = node_account.get_verifying_key();
@@ -124,6 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Some(Ok(job_witness)) = prover_scheduler.next() => {
                 info!("Calculated job_witness: {}", hash!(&job_witness));
+                node_account.verify_job_witness(registry_address, job_witness).await?;
             },
             else => break
         };

@@ -1,19 +1,21 @@
 use async_stream::try_stream;
 use futures::stream::Stream;
 use starknet::{
-    accounts::{Account, Call, SingleOwnerAccount},
-    core::{
-        types::{BlockId, EmittedEvent, EventFilter, FieldElement},
-        utils::get_selector_from_name,
-    },
+    core::types::{BlockId, EmittedEvent, EventFilter, FieldElement},
     providers::Provider,
-    signers::Signer,
 };
 use std::{error::Error, pin::Pin};
 use tracing::trace;
 
 const EVENT_SCRAPE_INTERVAL: u64 = 2;
-const REGISTRY_CONTRACT: &str = "0xcdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b";
+const REGISTRY_CONTRACT: &str =
+    "0x030938966f24f5084d9570ac52aeff76fe30559f4f3fe086a2b0cb4017ce4384";
+
+/*
+    Registry Handler
+    This object is responsible for handle continuous scraping of events from the Registry contract.
+    It scrapes the events from the Registry contract and provides a stream of events.
+*/
 
 pub struct RegistryHandler<P> {
     provider: P,
@@ -77,49 +79,5 @@ where
             }
         };
         Box::pin(stream)
-    }
-
-    pub async fn deposit<S>(
-        &self,
-        amount: FieldElement,
-        account: SingleOwnerAccount<P, S>,
-    ) -> Result<(), Box<dyn Error>>
-    where
-        S: Signer + Sync + Send + 'static,
-    {
-        let result = account
-            .execute(vec![Call {
-                to: self.registry_address,
-                selector: get_selector_from_name("deposit").unwrap(),
-                calldata: vec![amount],
-            }])
-            .send()
-            .await
-            .unwrap();
-
-        trace!("Deposit result: {:?}", result);
-        Ok(())
-    }
-
-    pub async fn balance<S>(
-        &self,
-        target: FieldElement,
-        account: SingleOwnerAccount<P, S>,
-    ) -> Result<(), Box<dyn Error>>
-    where
-        S: Signer + Sync + Send + 'static,
-    {
-        let result = account
-            .execute(vec![Call {
-                to: self.registry_address,
-                selector: get_selector_from_name("balance").unwrap(),
-                calldata: vec![target],
-            }])
-            .send()
-            .await
-            .unwrap();
-
-        trace!("Balance result: {:?}", result);
-        Ok(())
     }
 }

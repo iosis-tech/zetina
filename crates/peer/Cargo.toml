@@ -9,6 +9,7 @@ license-file.workspace = true
 
 [dependencies]
 async-stream.workspace = true
+crypto-bigint.workspace = true
 futures.workspace = true
 libp2p.workspace = true
 starknet.workspace = true

@@ -4,9 +4,8 @@ use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
 use sharp_p2p_common::{
     hash,
-    job::Job,
+    job::{Job, JobData},
     network::Network,
-    node_account::NodeAccount,
     process::Process,
     topic::{gossipsub_ident_topic, Topic},
 };
@@ -15,14 +14,14 @@ use sharp_p2p_compiler::{
     errors::CompilerControllerError,
     traits::CompilerController,
 };
-use sharp_p2p_peer::{registry::RegistryHandler, swarm::SwarmRunner};
+use sharp_p2p_peer::{node_account::NodeAccount, registry::RegistryHandler, swarm::SwarmRunner};
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
     sync::mpsc,
 };
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -58,15 +57,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
     let mut message_stream = swarm_runner.run(new_job_topic, send_topic_rx);
+    // TODO: Subscribe to `WitnessMetadata` event
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
-    let compiler = CairoCompiler::new(node_account.get_signing_key(), registry_address);
+    let compiler = CairoCompiler::new();
 
     let mut compiler_scheduler =
-        FuturesUnordered::<Process<'_, Result<Job, CompilerControllerError>>>::new();
+        FuturesUnordered::<Process<'_, Result<Vec<u8>, CompilerControllerError>>>::new();
 
     // Read cairo program path from stdin
     let mut stdin = BufReader::new(stdin()).lines();
+    // TODO: Accept dynamic tip
+    let tip = 0;
 
     loop {
         tokio::select! {
@@ -104,7 +106,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(Ok(event_vec)) = event_stream.next() => {
                 debug!("{:?}", event_vec);
             },
-            Some(Ok(job)) = compiler_scheduler.next() => {
+            Some(Ok(cairo_pie_compressed)) = compiler_scheduler.next() => {
+                let job_data = JobData::new(tip, cairo_pie_compressed,registry_address);
+                let expected_reward = job_data.reward;
+                let deposit_amount = node_account.balance(registry_address).await?;
+                if deposit_amount < expected_reward{
+                    error!("Staked amount is less than expected reward");
+                    return Ok(());
+                }
+                let job = Job::try_from_job_data(job_data, node_account.get_signing_key());
+
                 let serialized_job = serde_json::to_string(&job).unwrap();
                 send_topic_tx.send(serialized_job.into()).await?;
                 info!("Sent a new job: {}", hash!(&job));

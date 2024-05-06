@@ -9,6 +9,7 @@ license-file.workspace = true
 
 [dependencies]
 cairo-vm.workspace = true
+crypto-bigint.workspace = true
 futures.workspace = true
 hex.workspace = true
 libp2p.workspace = true

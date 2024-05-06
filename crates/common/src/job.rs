@@ -1,5 +1,6 @@
 use crate::hash;
 use cairo_vm::vm::runners::cairo_pie::CairoPie;
+use crypto_bigint::U256;
 use serde::{Deserialize, Serialize};
 use starknet::signers::{SigningKey, VerifyingKey};
 use starknet_crypto::{poseidon_hash_many, FieldElement, Signature};
@@ -40,11 +41,15 @@ impl Job {
             .verify(&message_hash, &Signature { r: self.signature_r, s: self.signature_s })
             .unwrap()
     }
+
+    pub fn reward(&self) -> U256 {
+        self.job_data.reward
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct JobData {
-    pub reward: u64,
+    pub reward: U256,
     pub num_of_steps: u64,
     #[serde(with = "chunk_felt_array")]
     pub cairo_pie_compressed: Vec<u8>,
@@ -52,14 +57,12 @@ pub struct JobData {
 }
 
 impl JobData {
-    pub fn new(reward: u64, cairo_pie_compressed: Vec<u8>, registry_address: FieldElement) -> Self {
+    pub fn new(tip: u64, cairo_pie_compressed: Vec<u8>, registry_address: FieldElement) -> Self {
         let pie = Self::decompress_cairo_pie(&cairo_pie_compressed);
-        Self {
-            reward,
-            num_of_steps: pie.execution_resources.n_steps as u64,
-            cairo_pie_compressed,
-            registry_address,
-        }
+        let num_of_steps = pie.execution_resources.n_steps as u64;
+        // TODO - calculate reward based on the number of steps and the tip
+        let reward = U256::from(num_of_steps / 10000 + tip);
+        Self { reward, num_of_steps, cairo_pie_compressed, registry_address }
     }
 
     fn decompress_cairo_pie(cairo_pie_compressed: &[u8]) -> CairoPie {
