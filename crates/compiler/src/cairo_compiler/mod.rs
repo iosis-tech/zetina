@@ -14,6 +14,11 @@ use tracing::debug;
 
 pub mod tests;
 
+/*
+    Cairo Compiler
+    This object is responsible for compiling the cairo program and generating the PIE.
+    It compiles the cairo program and generates the PIE.
+*/
 pub struct CairoCompiler {}
 
 impl CairoCompiler {
