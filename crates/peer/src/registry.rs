@@ -10,6 +10,12 @@ use tracing::trace;
 const EVENT_SCRAPE_INTERVAL: u64 = 2;
 const REGISTRY_CONTRACT: &str = "0xcdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b";
 
+/*
+    Registry Handler
+    This object is responsible for handle continuous scraping of events from the Registry contract.
+    It scrapes the events from the Registry contract and provides a stream of events.
+*/
+
 pub struct RegistryHandler<P> {
     provider: P,
     registry_address: FieldElement,

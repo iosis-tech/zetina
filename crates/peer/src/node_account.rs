@@ -11,6 +11,12 @@ use starknet::{
 };
 use tracing::trace;
 
+/*
+    Node Account
+    This object represents the account of a node in the network.
+    It holds the key pair for the p2p network, the account for the StarkNet network, and the signing key.
+    The account is used to interact with the Registry contract.
+*/
 pub struct NodeAccount<P>
 where
     P: Provider + Sync + Send + 'static,
@@ -21,8 +27,7 @@ where
     /// The account for the StarkNet network.
     /// This account is used to interact with the Registry contract.
     account: SingleOwnerAccount<P, LocalWallet>,
-    ///
-    ///
+    /// The signing key for the account.
     signing_key: SigningKey,
 }
 
