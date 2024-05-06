@@ -9,7 +9,7 @@ use starknet::{
     providers::Provider,
     signers::{LocalWallet, SigningKey, VerifyingKey},
 };
-use tracing::trace;
+use tracing::{info, trace};
 
 /*
     Node Account
@@ -109,8 +109,8 @@ where
 
         let low: u128 = call_result[0].try_into().unwrap();
         let high: u128 = call_result[1].try_into().unwrap();
-        let call_result = U256::from(high << 128 | low);
-        trace!("Balance result: {:?}", call_result);
+        let call_result = U256::from(high << 64 | low);
+        info!("Balance result: {:?}", call_result);
 
         Ok(call_result)
     }

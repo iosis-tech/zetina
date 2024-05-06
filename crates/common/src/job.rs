@@ -61,7 +61,7 @@ impl JobData {
         let pie = Self::decompress_cairo_pie(&cairo_pie_compressed);
         let num_of_steps = pie.execution_resources.n_steps as u64;
         // TODO - calculate reward based on the number of steps and the tip
-        let reward = U256::from(num_of_steps * 100 + tip);
+        let reward = U256::from(num_of_steps / 10000 + tip);
         Self { reward, num_of_steps, cairo_pie_compressed, registry_address }
     }
 

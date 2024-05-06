@@ -8,7 +8,8 @@ use std::{error::Error, pin::Pin};
 use tracing::trace;
 
 const EVENT_SCRAPE_INTERVAL: u64 = 2;
-const REGISTRY_CONTRACT: &str = "0xcdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b";
+const REGISTRY_CONTRACT: &str =
+    "0x030938966f24f5084d9570ac52aeff76fe30559f4f3fe086a2b0cb4017ce4384";
 
 /*
     Registry Handler

@@ -21,7 +21,7 @@ use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
     sync::mpsc,
 };
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Read cairo program path from stdin
     let mut stdin = BufReader::new(stdin()).lines();
     // TODO: Accept dynamic tip
-    let tip = 10;
+    let tip = 0;
 
     loop {
         tokio::select! {
@@ -110,13 +110,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let job_data = JobData::new(tip, cairo_pie_compressed,registry_address);
                 let expected_reward = job_data.reward;
                 let deposit_amount = node_account.balance(registry_address).await?;
-                // TODO: handle error better way
                 if deposit_amount < expected_reward{
-                    return Err("Staked amount is less than expected reward".into());
+                    error!("Staked amount is less than expected reward");
+                    return Ok(());
                 }
                 let job = Job::try_from_job_data(job_data, node_account.get_signing_key());
-                // info!("Job: {:?}", job.job_data.reward);
-                // info!("Job: {:?}", job.job_data.num_of_steps);
+
                 let serialized_job = serde_json::to_string(&job).unwrap();
                 send_topic_tx.send(serialized_job.into()).await?;
                 info!("Sent a new job: {}", hash!(&job));
