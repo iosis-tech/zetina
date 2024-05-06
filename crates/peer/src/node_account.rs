@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use crypto_bigint::U256;
-use sharp_p2p_common::network::Network;
+use sharp_p2p_common::{job_witness::JobWitness, network::Network};
 use starknet::{
     accounts::{Account, Call, ConnectedAccount, ExecutionEncoding, SingleOwnerAccount},
     core::types::{BlockId, BlockTag, FieldElement, FunctionCall},
@@ -108,5 +108,45 @@ where
         trace!("Balance result: {:?}", call_result);
 
         Ok(call_result)
+    }
+
+    pub async fn withdraw(
+        &self,
+        amount: FieldElement,
+        registry_address: FieldElement,
+    ) -> Result<(), Box<dyn Error>> {
+        let result = self
+            .account
+            .execute(vec![Call {
+                to: registry_address,
+                selector: selector!("withdraw"),
+                calldata: vec![amount],
+            }])
+            .send()
+            .await
+            .unwrap();
+
+        trace!("Withdraw result: {:?}", result);
+        Ok(())
+    }
+
+    pub async fn verify_job_witness(
+        &self,
+        registry_address: FieldElement,
+        job_withness: JobWitness,
+    ) -> Result<(), Box<dyn Error>> {
+        let result = self
+            .account
+            .execute(vec![Call {
+                to: registry_address,
+                selector: selector!("verify_job_witness"),
+                calldata: job_withness.proof,
+            }])
+            .send()
+            .await
+            .unwrap();
+
+        trace!("Verify job witness result: {:?}", result);
+        Ok(())
     }
 }

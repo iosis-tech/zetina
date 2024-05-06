@@ -57,6 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
     let mut message_stream = swarm_runner.run(new_job_topic, send_topic_rx);
+    // TODO: Subscribe to `WitnessMetadata` event
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
     let compiler = CairoCompiler::new();
@@ -108,9 +109,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(Ok(cairo_pie_compressed)) = compiler_scheduler.next() => {
                 let job_data = JobData::new(tip, cairo_pie_compressed,registry_address);
                 let expected_reward = job_data.reward;
-                let staked_amount = node_account.balance(registry_address).await?;
+                let deposit_amount = node_account.balance(registry_address).await?;
                 // TODO: handle error better way
-                if staked_amount < expected_reward{
+                if deposit_amount < expected_reward{
                     return Err("Staked amount is less than expected reward".into());
                 }
                 let job = Job::try_from_job_data(job_data, node_account.get_signing_key());

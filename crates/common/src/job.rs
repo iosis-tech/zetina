@@ -41,6 +41,10 @@ impl Job {
             .verify(&message_hash, &Signature { r: self.signature_r, s: self.signature_s })
             .unwrap()
     }
+
+    pub fn reward(&self) -> U256 {
+        self.job_data.reward
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
