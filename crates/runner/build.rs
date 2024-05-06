@@ -29,6 +29,7 @@ fn main() {
         .arg("--output")
         .arg(&out_dir.join(bootloader_out_name))
         .arg("--proof_mode")
+        .arg("--no_debug_info")
         .output()
         .expect("bootloader compile failed");
 }

@@ -79,7 +79,7 @@ where
         Box::pin(stream)
     }
 
-    pub async fn stake<S>(
+    pub async fn deposit<S>(
         &self,
         amount: FieldElement,
         account: SingleOwnerAccount<P, S>,
@@ -90,14 +90,36 @@ where
         let result = account
             .execute(vec![Call {
                 to: self.registry_address,
-                selector: get_selector_from_name("stake").unwrap(),
+                selector: get_selector_from_name("deposit").unwrap(),
                 calldata: vec![amount],
             }])
             .send()
             .await
             .unwrap();
 
-        trace!("Stake result: {:?}", result);
+        trace!("Deposit result: {:?}", result);
+        Ok(())
+    }
+
+    pub async fn balance<S>(
+        &self,
+        target: FieldElement,
+        account: SingleOwnerAccount<P, S>,
+    ) -> Result<(), Box<dyn Error>>
+    where
+        S: Signer + Sync + Send + 'static,
+    {
+        let result = account
+            .execute(vec![Call {
+                to: self.registry_address,
+                selector: get_selector_from_name("balance").unwrap(),
+                calldata: vec![target],
+            }])
+            .send()
+            .await
+            .unwrap();
+
+        trace!("Balance result: {:?}", result);
         Ok(())
     }
 }
