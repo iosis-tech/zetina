@@ -1,13 +1,17 @@
 # SHARP-P2P
 
 <div align="center">
-  <img src=".github/sharp-p2p-logo.png" alt="SHARP-P2P Logo" width="200">
-  <br><br>
-  <img src="https://img.shields.io/badge/v0.1.3-green?style=flat-square&logo=git&logoColor=white&label=version" alt="Version">
-  <a href="https://docs.sharp-p2p.iosis.tech/introduction.html">
-    <img src="https://img.shields.io/badge/v0.1.3-blue?style=flat-square&logo=mdbook&logoColor=white&label=docs" alt="Docs">
-  </a>
-  <img src="https://img.shields.io/github/actions/workflow/status/iosis-tech/sharp-p2p/test.yaml?style=flat-square&logo=githubactions&logoColor=white&label=Continuous%20Integration" alt="Continuous Integration">
+   <span style="pointer-events: none;">
+      <img src=".github/sharp-p2p-logo.png" alt="SHARP-P2P Logo" width="200">
+      <br><br>
+      <img src="https://img.shields.io/badge/v0.1.3-green?style=flat-square&logo=git&logoColor=white&label=version" alt="Version">
+   </span>
+   <a href="https://docs.sharp-p2p.iosis.tech/introduction.html" target="_blank">
+      <img src="https://img.shields.io/badge/v0.1.3-blue?style=flat-square&logo=mdbook&logoColor=white&label=docs" alt="Docs">
+   </a>
+   <span style="pointer-events: none;">
+      <img src="https://img.shields.io/github/actions/workflow/status/iosis-tech/sharp-p2p/test.yaml?style=flat-square&logo=githubactions&logoColor=white&label=Continuous%20Integration" alt="Continuous Integration">
+   </span>
 </div>
 
 ## Overview
