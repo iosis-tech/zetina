@@ -1,6 +1,10 @@
 [book]
-authors = ["Okm165"]
-language = "en"
-multilingual = false
-src = "src"
 title = "SHARP-P2P documentation"
+description = "Documentation for SHARP-P2P, a shared peer-to-peer network of Zero-Knowledge Provers."
+authors = ["Okm165 - Bartosz Nowak"]
+language = "en"
+
+[output.html]
+smart-punctuation = true
+mathjax-support = true
+git-repository-url = "https://github.com/iosis-tech/sharp-p2p"
