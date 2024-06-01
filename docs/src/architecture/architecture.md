@@ -15,3 +15,5 @@ We will explore the job pathway as it goes from Delegator to Executor via the pe
 6. **Submission to Registry and Receiving Reward**: The Executor promptly submits the job to the Registry. The Registry verifies the signature of the Delegator, the hash of the job, and the job proof of correctness. If all criteria are met, the Registry sends the funds as a reward. The Delegator subscribes to the Registry contract events and, when a job is successfully registered, the output of the job is emitted.
 
 To sum up, the Delegator pays the Executor for doing their job in a way that is safe and sound for both parties of the SHARP-P2P network.
+
+![Architecture](architecture.svg)

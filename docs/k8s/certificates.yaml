@@ -1,0 +1,13 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: docs-sharp-p2p-cert
+spec:
+  secretName: docs-sharp-p2p-tls
+
+  dnsNames:
+    - docs.sharp-p2p.iosis.tech
+  issuerRef:
+    name: letsencrypt-http01
+    kind: Issuer

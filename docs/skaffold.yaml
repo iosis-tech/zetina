@@ -1,0 +1,11 @@
+apiVersion: skaffold/v4beta3
+kind: Config
+build:
+  artifacts:
+  - image: registry.internal.iosis.tech/sharp-p2p-docs
+    docker:
+      dockerfile: Dockerfile
+manifests:
+  kustomize:
+    paths:
+      - ./k8s

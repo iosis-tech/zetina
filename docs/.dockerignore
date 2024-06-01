@@ -1,0 +1,10 @@
+# Exclude Kubernetes configuration files
+k8s/
+skaffold.yaml
+
+# Exclude Docker-related files
+Dockerfile
+.dockerignore
+
+# Exclude Git-related files
+.gitignore
