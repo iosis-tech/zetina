@@ -34,10 +34,35 @@ args = ["clean"]
 command = "cargo"
 args = ["build"]
 
-[tasks.test]
+[tasks.test-rust]
 workspace = false
 command = "cargo"
 args = ["nextest", "run", "--workspace", "${@}"]
+
+[tasks.full-test-rust]
+workspace = false
+command = "cargo"
+args = ["nextest", "run", "--workspace", "${@}", "--features", "full_test"]
+
+[tasks.test-scarb]
+workspace = false
+script = [
+    "scarb test"
+]
+
+[tasks.light-test]
+workspace = false
+dependencies = [
+    "test-rust",
+    "test-scarb",
+]
+
+[tasks.full-test]
+workspace = false
+dependencies = [
+    "test-scarb",
+    "full-test-rust",
+]
 
 [tasks.python-requirements-install]
 workspace = false
@@ -75,4 +100,12 @@ dependencies = [
     "python-requirements-install",
     "python-bootloader-install",
     "stone-prover-install",
+]
+
+[tasks.commit]
+workspace = false
+dependencies = [
+    "clean",
+    "full-format",
+    "full-test",
 ]

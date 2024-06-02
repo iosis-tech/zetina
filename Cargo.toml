@@ -17,17 +17,20 @@ members = [
 exclude = []
 
 [workspace.package]
-version = "0.1.3"
+description = "A shared peer-to-peer network of Zero-Knowledge Provers"
 edition = "2021"
-repository = "https://github.com/iosis-tech/sharp-p2p"
+homepage = "https://docs.sharp-p2p.iosis.tech/"
 license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/iosis-tech/sharp-p2p"
+version = "0.1.3"
 
 [workspace.dependencies]
 async-process = "2.2.0"
 async-stream = "0.3.5"
 bincode = "1.3"
 cairo-proof-parser = { git = "https://github.com/Okm165/cairo-proof-parser", rev = "97a04bbee07330311b38d6f4cecfed3acb237626" }
-cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm.git" }
+cairo-vm = { git = "https://github.com/lambdaclass/cairo-vm.git", tag = "v1.0.0-rc3" }
 futures = "0.3.30"
 futures-core = "0.3.30"
 futures-util = "0.3.30"

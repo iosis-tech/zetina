@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"),
     )
     .join("../../");
-    let program_path = ws_root.join("target/bootloader.json");
+    let bootloader_program_path = ws_root.join("target/bootloader.json");
 
     // TODO: common setup in node initiate binary
     let network = Network::Sepolia;
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
     let verifying_key = node_account.get_verifying_key();
-    let runner = CairoRunner::new(program_path, &verifying_key);
+    let runner = CairoRunner::new(bootloader_program_path, &verifying_key);
     let prover = StoneProver::new();
 
     let mut job_record = JobRecord::<Job>::new();
