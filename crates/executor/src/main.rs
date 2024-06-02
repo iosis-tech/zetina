@@ -3,6 +3,7 @@
 use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
 use sharp_p2p_common::{
+    graceful_shutdown::shutdown_signal,
     hash,
     job::Job,
     job_record::JobRecord,
@@ -125,6 +126,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(Ok(job_witness)) = prover_scheduler.next() => {
                 info!("Calculated job_witness: {}", hash!(&job_witness));
             },
+            _ = shutdown_signal() => {
+                break
+            }
             else => break
         };
 

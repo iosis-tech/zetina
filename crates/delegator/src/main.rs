@@ -3,6 +3,7 @@
 use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
 use sharp_p2p_common::{
+    graceful_shutdown::shutdown_signal,
     hash,
     job::Job,
     network::Network,
@@ -109,6 +110,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 send_topic_tx.send(serialized_job.into()).await?;
                 info!("Sent a new job: {}", hash!(&job));
             },
+            _ = shutdown_signal() => {
+                break
+            }
             else => break
         }
     }
