@@ -1,32 +1,17 @@
-# Use a Debian-based Linux distribution as the base image
+# Stage 1: Use the stone-prover image to copy the executable
+FROM stone-prover AS stone-prover
+
+# Stage 2: Use a Debian-based Linux distribution as the base image
 FROM --platform=linux/amd64 debian:stable-slim
 
+# Set the default shell to bash
+SHELL ["/bin/bash", "-ci"]
+
 # Install necessary packages for Rust and Python development
-RUN apt-get update && \
-    apt-get install -y \
+RUN apt-get update && apt-get install -y \
     curl \
     gcc \
     libc6-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Rust using Rustup
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-
-# Add Rust binaries to the PATH
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# Display installed Rust version
-RUN rustc --version && cargo --version
-
-# Install cargo-make
-RUN cargo install --force cargo-make
-
-# Install cargo-nextest
-RUN curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
-
-# Install dependencies for Pyenv and Python
-RUN apt-get update && \
-    apt-get install -y \
     make \
     build-essential \
     libssl-dev \
@@ -35,7 +20,6 @@ RUN apt-get update && \
     libreadline-dev \
     libsqlite3-dev \
     wget \
-    curl \
     llvm \
     libncurses5-dev \
     libncursesw5-dev \
@@ -49,29 +33,41 @@ RUN apt-get update && \
     libdw1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Pyenv
-RUN curl https://pyenv.run | bash
+# Install Rust using Rustup
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    echo 'export PATH="/root/.cargo/bin:$PATH"' >> /root/.bashrc
 
-RUN echo 'export PATH="/root/.pyenv/bin:$PATH"' >> /root/.bashrc && \
+# Install cargo-make and cargo-nextest
+RUN cargo install --force cargo-make && \
+    curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+
+# Install Pyenv
+RUN curl https://pyenv.run | bash && \
+    echo 'export PATH="/root/.pyenv/bin:$PATH"' >> /root/.bashrc && \
     echo 'eval "$(pyenv init -)"' >> /root/.bashrc && \
     echo 'eval "$(pyenv virtualenv-init -)"' >> /root/.bashrc
 
-SHELL ["/bin/bash", "-c"]
-
-# Set Pyenv environment variables
-ENV PATH="/root/.pyenv/bin:$PATH"
-
 # Install Python 3.9.0 using Pyenv
-RUN eval "$(pyenv init -)" && \
-    eval "$(pyenv virtualenv-init -)" && \
-    pyenv install 3.12.0 && \
-    pyenv global 3.12.0 && \
+RUN pyenv install 3.9.0 && \
+    pyenv global 3.9.0 && \
     pyenv --version && \
     python -V && \
     pip install --upgrade pip
 
-# Install docker
-RUN curl -fsSL https://get.docker.com | bash
+# Add Python and cargo executables to PATH
+RUN mkdir -p /root/.local/bin && \
+    echo 'export PATH="/root/.local/bin:$PATH"' >> /root/.bashrc
 
-RUN mkdir -p /root/.local/bin
-RUN echo 'export PATH="/root/.local/bin:$PATH"' >> /root/.bashrc
+# Copy the executable from stone-prover image
+COPY --from=stone-prover /bin/cpu_air_prover /root/.local/bin/
+COPY --from=stone-prover /bin/cpu_air_verifier /root/.local/bin/
+
+# Set the working directory
+WORKDIR /sharp-p2p
+
+# Copy the current directory content into the container
+COPY . .
+
+# Install requirements
+RUN cargo make python-requirements-install && \
+    cargo make python-bootloader-install

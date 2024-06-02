@@ -1,8 +1,11 @@
-# Use a Debian-based Linux distribution as the base image
-FROM runtime AS base
+# Use the base runtime image
+FROM runtime
 
-# Set the working directory
-WORKDIR /sharp-p2p
+# Build
+RUN cargo build --release --bin sharp-p2p-executor
+
+# Expose necessary ports
+EXPOSE 5678/udp 5679/tcp
 
 # Set the default command to run when the container starts
-CMD ["bash"]
+CMD ["bash", "-ci", "cargo run --release --bin sharp-p2p-executor"]
