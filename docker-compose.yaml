@@ -2,6 +2,7 @@ services:
   runtime:
     build:
       dockerfile: runtime.dockerfile
+    image: runtime
 
   devcontainer:
     build:
