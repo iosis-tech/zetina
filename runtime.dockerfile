@@ -64,8 +64,8 @@ ENV PATH="/root/.pyenv/bin:$PATH"
 # Install Python 3.9.0 using Pyenv
 RUN eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
-    pyenv install 3.9.0 && \
-    pyenv global 3.9.0 && \
+    pyenv install 3.12.0 && \
+    pyenv global 3.12.0 && \
     pyenv --version && \
     python -V && \
     pip install --upgrade pip
@@ -75,9 +75,3 @@ RUN curl -fsSL https://get.docker.com | bash
 
 RUN mkdir -p /root/.local/bin
 RUN echo 'export PATH="/root/.local/bin:$PATH"' >> /root/.bashrc
-
-# Set the working directory
-WORKDIR /workshop
-
-# Set the default command to run when the container starts
-CMD ["bash"]
