@@ -1,0 +1,51 @@
+services:
+  stone-prover:
+    build:
+      context: stone-prover
+      dockerfile: Dockerfile
+    image: stone-prover
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: '10G'
+
+  runtime:
+    build:
+      dockerfile: runtime.dockerfile
+    image: runtime
+    depends_on:
+      - stone-prover
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: '10G'
+
+  delegator:
+    build:
+      dockerfile: delegator.dockerfile
+    depends_on:
+      - runtime
+    ports:
+      - "5678:5678/udp"
+      - "5679:5679/tcp"
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: '10G'
+
+  executor:
+    build:
+      dockerfile: executor.dockerfile
+    depends_on:
+      - runtime
+    ports:
+      - "5698:5678/udp"
+      - "5699:5679/tcp"
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: '10G'

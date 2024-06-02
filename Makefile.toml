@@ -15,7 +15,7 @@ args = ["fmt"]
 [tasks.cairo-format]
 workspace = false
 script = [
-    "find cairo -name '*.cairo' ! -path 'cairo/build/*' -exec sh -c 'cairo-format -i \"$1\"; echo \"Formatted: $1\"' _ {} \\;"
+    'for file in $(find cairo -name "*.cairo" ! -path "cairo/build/*"); do cairo-format -i $file && echo \"Formatted: $file\"; done'
 ]
 
 [tasks.full-format]

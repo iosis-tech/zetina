@@ -47,8 +47,8 @@ impl SwarmRunner {
             swarm.behaviour_mut().gossipsub.subscribe(topic)?;
         }
 
-        swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
-        swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
+        swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
+        swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
 
         Ok(SwarmRunner { swarm, cancellation_token: CancellationToken::new() })
     }
