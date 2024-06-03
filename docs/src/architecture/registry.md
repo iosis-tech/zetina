@@ -1,6 +1,6 @@
 ## Registry Contract
 
-The Registry contract is a critical component of the SHARP-P2P network, responsible for the following tasks:
+The Registry contract is a critical component of the Zetina network, responsible for the following tasks:
 
 1. **Fund Management**: Delegators deposit funds into the Registry to offer rewards for job execution. The Registry securely holds these funds until they are distributed to Executors.
 
@@ -10,4 +10,4 @@ The Registry contract is a critical component of the SHARP-P2P network, responsi
 
 4. **Security**: The Registry ensures that only valid and correctly executed jobs are rewarded. This provides a layer of trust and security for both Delegators and Executors in the network.
 
-By managing the financial and verification aspects, the Registry contract plays a pivotal role in maintaining the integrity and efficiency of the Sharp p2p network.
+By managing the financial and verification aspects, the Registry contract plays a pivotal role in maintaining the integrity and efficiency of the Zetina network.

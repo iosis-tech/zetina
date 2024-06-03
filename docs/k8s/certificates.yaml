@@ -2,12 +2,12 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: docs-sharp-p2p-cert
+  name: docs-zetina-cert
 spec:
-  secretName: docs-sharp-p2p-tls
+  secretName: docs-zetina-tls
 
   dnsNames:
-    - docs.sharp-p2p.iosis.tech
+    - docs.zetina.iosis.tech
   issuerRef:
     name: letsencrypt-http01
     kind: Issuer

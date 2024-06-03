@@ -1,6 +1,6 @@
-# SHARP-P2P
+# ZETINA
 
-The Sharp p2p is a shared peer-to-peer network of Zero-Knowledge Provers. This network allows any party to join and utilize its services, operating with two main user roles:
+The Zetina is a shared peer-to-peer network of Zero-Knowledge Provers. This network allows any party to join and utilize its services, operating with two main user roles:
 
 1. **Delegators**: Users who present jobs to be executed on the network.
 2. **Executors**: Users who execute the jobs submitted by Delegators.

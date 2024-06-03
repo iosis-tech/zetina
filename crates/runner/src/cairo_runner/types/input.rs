@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use sharp_p2p_common::job::Job;
 use starknet_crypto::FieldElement;
+use zetina_common::job::Job;
 
 #[derive(Serialize, Deserialize)]
 pub struct SimpleBootloaderInput {

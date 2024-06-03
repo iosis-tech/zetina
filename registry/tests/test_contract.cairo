@@ -3,7 +3,7 @@ pub mod proofs;
 use starknet::ContractAddress;
 use snforge_std::{declare, ContractClassTrait};
 use registry::{
-    ISharpP2PRegistryDispatcher, ISharpP2PRegistryDispatcherTrait, SharpP2PRegistry::get_metadata
+    IZetinaRegistryDispatcher, IZetinaRegistryDispatcherTrait, ZetinaRegistry::get_metadata
 };
 use cairo_verifier::StarkProofWithSerde;
 

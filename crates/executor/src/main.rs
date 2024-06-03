@@ -2,7 +2,15 @@
 
 use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
-use sharp_p2p_common::{
+use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
+use std::hash::{DefaultHasher, Hash, Hasher};
+use tokio::{
+    io::{stdin, AsyncBufReadExt, BufReader},
+    sync::mpsc,
+};
+use tracing::{debug, info};
+use tracing_subscriber::EnvFilter;
+use zetina_common::{
     graceful_shutdown::shutdown_signal,
     hash,
     job::Job,
@@ -14,21 +22,13 @@ use sharp_p2p_common::{
     process::Process,
     topic::{gossipsub_ident_topic, Topic},
 };
-use sharp_p2p_peer::{registry::RegistryHandler, swarm::SwarmRunner};
-use sharp_p2p_prover::{
+use zetina_peer::{registry::RegistryHandler, swarm::SwarmRunner};
+use zetina_prover::{
     errors::ProverControllerError, stone_prover::StoneProver, traits::ProverController,
 };
-use sharp_p2p_runner::{
+use zetina_runner::{
     cairo_runner::CairoRunner, errors::RunnerControllerError, traits::RunnerController,
 };
-use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
-use std::hash::{DefaultHasher, Hash, Hasher};
-use tokio::{
-    io::{stdin, AsyncBufReadExt, BufReader},
-    sync::mpsc,
-};
-use tracing::{debug, info};
-use tracing_subscriber::EnvFilter;
 
 const MAX_PARALLEL_JOBS: usize = 1;
 

@@ -1,5 +1,5 @@
 [package]
-name = "sharp-p2p-executor"
+name = "zetina-executor"
 description.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -15,10 +15,10 @@ futures.workspace = true
 hex.workspace = true
 libp2p.workspace = true
 serde_json.workspace = true
-sharp-p2p-common.workspace = true
-sharp-p2p-peer.workspace = true
-sharp-p2p-prover.workspace = true
-sharp-p2p-runner.workspace = true
+zetina-common.workspace = true
+zetina-peer.workspace = true
+zetina-prover.workspace = true
+zetina-runner.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true

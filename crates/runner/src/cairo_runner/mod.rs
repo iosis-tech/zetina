@@ -2,7 +2,6 @@ use self::types::input::SimpleBootloaderInput;
 use crate::{errors::RunnerControllerError, traits::RunnerController};
 use async_process::Stdio;
 use futures::Future;
-use sharp_p2p_common::{hash, job::Job, job_trace::JobTrace, layout::Layout, process::Process};
 use starknet::signers::VerifyingKey;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
@@ -12,6 +11,7 @@ use std::{io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
 use tokio::{process::Command, select, sync::mpsc};
 use tracing::debug;
+use zetina_common::{hash, job::Job, job_trace::JobTrace, layout::Layout, process::Process};
 
 pub mod tests;
 pub mod types;

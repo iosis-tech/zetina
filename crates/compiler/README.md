@@ -1,1 +1,1 @@
-## sharp-p2p-compiler
+## zetina-compiler

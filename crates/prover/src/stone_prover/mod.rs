@@ -7,9 +7,6 @@ use async_process::Stdio;
 use futures::Future;
 use itertools::{chain, Itertools};
 use serde_json::Value;
-use sharp_p2p_common::{
-    argvec::ArgVec, hash, job_trace::JobTrace, job_witness::JobWitness, process::Process,
-};
 use std::{
     fs,
     hash::{DefaultHasher, Hash, Hasher},
@@ -19,6 +16,9 @@ use std::{
 use tempfile::NamedTempFile;
 use tokio::{process::Command, select, sync::mpsc};
 use tracing::debug;
+use zetina_common::{
+    argvec::ArgVec, hash, job_trace::JobTrace, job_witness::JobWitness, process::Process,
+};
 
 pub mod tests;
 pub mod types;

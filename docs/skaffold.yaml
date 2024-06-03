@@ -2,7 +2,7 @@ apiVersion: skaffold/v4beta3
 kind: Config
 build:
   artifacts:
-  - image: registry.internal.iosis.tech/sharp-p2p-docs
+  - image: registry.internal.iosis.tech/zetina-docs
     docker:
       dockerfile: Dockerfile
 manifests:

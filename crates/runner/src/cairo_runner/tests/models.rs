@@ -1,5 +1,5 @@
 use rand::{thread_rng, Rng};
-use sharp_p2p_common::job::{Job, JobData};
+use zetina_common::job::{Job, JobData};
 
 use starknet::signers::SigningKey;
 use starknet_crypto::FieldElement;

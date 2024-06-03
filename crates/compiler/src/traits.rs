@@ -1,6 +1,6 @@
 use crate::errors::CompilerControllerError;
-use sharp_p2p_common::{job::Job, process::Process};
 use std::path::PathBuf;
+use zetina_common::{job::Job, process::Process};
 
 /*
     The `CompilerController` trait is responsible for taking a user's program and preparing a `Job` object.

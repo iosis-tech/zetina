@@ -1,1 +1,1 @@
-## sharp-p2p-prover
+## zetina-prover

@@ -1,5 +1,5 @@
 [package]
-name = "sharp-p2p-runner"
+name = "zetina-runner"
 description.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -17,7 +17,7 @@ libp2p.workspace = true
 rand.workspace = true
 serde_json.workspace = true
 serde.workspace = true
-sharp-p2p-common.workspace = true
+zetina-common.workspace = true
 starknet.workspace = true
 starknet-crypto.workspace = true
 tempfile.workspace = true

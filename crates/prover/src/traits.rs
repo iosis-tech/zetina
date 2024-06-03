@@ -1,5 +1,5 @@
 use crate::errors::ProverControllerError;
-use sharp_p2p_common::{job_trace::JobTrace, job_witness::JobWitness, process::Process};
+use zetina_common::{job_trace::JobTrace, job_witness::JobWitness, process::Process};
 
 /*
     The `ProverController` trait defines the behavior for creating zkSTARK proofs from a `JobTrace` obtained from a `RunnerController`.

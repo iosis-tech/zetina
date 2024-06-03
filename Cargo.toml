@@ -19,10 +19,10 @@ exclude = []
 [workspace.package]
 description = "A shared peer-to-peer network of Zero-Knowledge Provers"
 edition = "2021"
-homepage = "https://docs.sharp-p2p.iosis.tech/"
+homepage = "https://docs.zetina.iosis.tech/"
 license-file = "LICENSE"
 readme = "README.md"
-repository = "https://github.com/iosis-tech/sharp-p2p"
+repository = "https://github.com/iosis-tech/zetina"
 version = "0.1.3"
 
 [workspace.dependencies]
@@ -65,11 +65,11 @@ tokio-util = "0.7.10"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-sharp-p2p-common = { path = "crates/common" }
-sharp-p2p-compiler = { path = "crates/compiler" }
-sharp-p2p-delegator = { path = "crates/delegator" }
-sharp-p2p-executor = { path = "crates/executor" }
-sharp-p2p-peer = { path = "crates/peer" }
-sharp-p2p-prover = { path = "crates/prover" }
-sharp-p2p-runner = { path = "crates/runner" }
-sharp-p2p-tests = { path = "crates/tests" }
+zetina-common = { path = "crates/common" }
+zetina-compiler = { path = "crates/compiler" }
+zetina-delegator = { path = "crates/delegator" }
+zetina-executor = { path = "crates/executor" }
+zetina-peer = { path = "crates/peer" }
+zetina-prover = { path = "crates/prover" }
+zetina-runner = { path = "crates/runner" }
+zetina-tests = { path = "crates/tests" }

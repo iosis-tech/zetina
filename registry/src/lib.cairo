@@ -2,7 +2,7 @@ use cairo_verifier::StarkProofWithSerde;
 use starknet::ContractAddress;
 
 #[starknet::interface]
-pub trait ISharpP2PRegistry<TContractState> {
+pub trait IZetinaRegistry<TContractState> {
     fn deposit(ref self: TContractState, amount: u256);
     fn withdraw(ref self: TContractState, amount: u256);
     fn balance(self: @TContractState, account: ContractAddress) -> u256;
@@ -19,8 +19,8 @@ pub trait IFactRegistry<TContractState> {
 }
 
 #[starknet::contract]
-pub mod SharpP2PRegistry {
-    use registry::ISharpP2PRegistry;
+pub mod ZetinaRegistry {
+    use registry::IZetinaRegistry;
     use openzeppelin::token::erc20::interface::IERC20DispatcherTrait;
     use cairo_verifier::{
         StarkProofWithSerde, air::public_input::PublicInput,
@@ -93,7 +93,7 @@ pub mod SharpP2PRegistry {
     }
 
     #[abi(embed_v0)]
-    impl SharpP2PRegistryImpl of super::ISharpP2PRegistry<ContractState> {
+    impl ZetinaRegistryImpl of super::IZetinaRegistry<ContractState> {
         fn deposit(ref self: ContractState, amount: u256) {
             let caller = get_caller_address();
             let this_contract = get_contract_address();

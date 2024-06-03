@@ -63,7 +63,7 @@ COPY --from=stone-prover /bin/cpu_air_prover /root/.local/bin/
 COPY --from=stone-prover /bin/cpu_air_verifier /root/.local/bin/
 
 # Set the working directory
-WORKDIR /sharp-p2p
+WORKDIR /zetina
 
 # Copy the current directory content into the container
 COPY cairo/ cairo/

@@ -1,10 +1,10 @@
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
-use sharp_p2p_prover::{stone_prover::StoneProver, traits::ProverController};
-use sharp_p2p_runner::{
+use starknet::signers::SigningKey;
+use zetina_prover::{stone_prover::StoneProver, traits::ProverController};
+use zetina_runner::{
     cairo_runner::{tests::models::fixture as runner_fixture, CairoRunner},
     traits::RunnerController,
 };
-use starknet::signers::SigningKey;
 
 #[tokio::test]
 async fn run_single_job() {

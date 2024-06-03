@@ -1,9 +1,9 @@
 import setuptools
 
 setuptools.setup(
-    name="sharp_p2p_bootloader",
+    name="zetina_bootloader",
     version="0.3",
-    description="sharp_p2p bootloader",
+    description="zetina bootloader",
     url="#",
     author="Okm165",
     packages=setuptools.find_packages(),

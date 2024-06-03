@@ -1,1 +1,1 @@
-## sharp-p2p-delegator
+## zetina-delegator

@@ -1,13 +1,13 @@
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
-use sharp_p2p_compiler::cairo_compiler::tests::models::fixture as compiler_fixture;
-use sharp_p2p_compiler::cairo_compiler::CairoCompiler;
-use sharp_p2p_compiler::traits::CompilerController;
-use sharp_p2p_runner::cairo_runner::tests::models::fixture as runner_fixture;
-use sharp_p2p_runner::cairo_runner::CairoRunner;
-use sharp_p2p_runner::traits::RunnerController;
 use starknet::signers::SigningKey;
 use starknet_crypto::FieldElement;
+use zetina_compiler::cairo_compiler::tests::models::fixture as compiler_fixture;
+use zetina_compiler::cairo_compiler::CairoCompiler;
+use zetina_compiler::traits::CompilerController;
+use zetina_runner::cairo_runner::tests::models::fixture as runner_fixture;
+use zetina_runner::cairo_runner::CairoRunner;
+use zetina_runner::traits::RunnerController;
 
 #[tokio::test]
 async fn run_single_job() {

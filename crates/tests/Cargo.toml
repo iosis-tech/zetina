@@ -1,5 +1,5 @@
 [package]
-name = "sharp-p2p-tests"
+name = "zetina-tests"
 description.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -16,9 +16,9 @@ version.workspace = true
 futures.workspace = true
 libp2p.workspace = true
 rand.workspace = true
-sharp-p2p-compiler.workspace = true
-sharp-p2p-prover.workspace = true
-sharp-p2p-runner.workspace = true
+zetina-compiler.workspace = true
+zetina-prover.workspace = true
+zetina-runner.workspace = true
 starknet-crypto.workspace = true
 starknet.workspace = true
 tokio.workspace = true

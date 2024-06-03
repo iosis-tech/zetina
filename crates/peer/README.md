@@ -1,1 +1,1 @@
-## sharp-p2p-peer
+## zetina-peer

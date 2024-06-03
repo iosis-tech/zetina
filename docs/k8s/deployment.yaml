@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: nginx-container
-        image: registry.internal.iosis.tech/sharp-p2p-docs:latest
+        image: registry.internal.iosis.tech/zetina-docs:latest
         ports:
         - containerPort: 80
 
@@ -40,10 +40,10 @@ spec:
   ingressClassName: nginx-ingress-prod
   tls:
     - hosts:
-        - docs.sharp-p2p.iosis.tech
-      secretName: docs-sharp-p2p-tls
+        - docs.zetina.iosis.tech
+      secretName: docs-zetina-tls
   rules:
-    - host: docs.sharp-p2p.iosis.tech
+    - host: docs.zetina.iosis.tech
       http:
         paths:
           - path: /

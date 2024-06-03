@@ -1,6 +1,6 @@
-use sharp_p2p_common::job_trace::JobTrace;
 use std::{env, fs, io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
+use zetina_common::job_trace::JobTrace;
 
 pub struct TestFixture {
     pub job_trace: JobTrace,

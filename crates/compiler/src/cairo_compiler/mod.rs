@@ -3,9 +3,6 @@ use async_process::Stdio;
 use futures::Future;
 use rand::{thread_rng, Rng};
 use serde_json::json;
-use sharp_p2p_common::job::JobData;
-use sharp_p2p_common::layout::Layout;
-use sharp_p2p_common::{job::Job, process::Process};
 use starknet::signers::SigningKey;
 use starknet_crypto::FieldElement;
 use std::io::Write;
@@ -14,6 +11,9 @@ use std::{io::Read, pin::Pin};
 use tempfile::NamedTempFile;
 use tokio::{process::Command, select, sync::mpsc};
 use tracing::debug;
+use zetina_common::job::JobData;
+use zetina_common::layout::Layout;
+use zetina_common::{job::Job, process::Process};
 
 pub mod tests;
 

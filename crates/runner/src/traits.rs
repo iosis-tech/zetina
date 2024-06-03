@@ -1,5 +1,5 @@
 use crate::errors::RunnerControllerError;
-use sharp_p2p_common::{job::Job, job_trace::JobTrace, process::Process};
+use zetina_common::{job::Job, job_trace::JobTrace, process::Process};
 
 /*
     The `RunnerController` trait defines the responsibility for executing a `Job` within a Cairo bootloader environment.

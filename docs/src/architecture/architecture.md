@@ -2,7 +2,7 @@
 
 We will explore the job pathway as it goes from Delegator to Executor via the peer-to-peer network to better understand the workings of this service:
 
-1. **Delegator Initiates Job**: The Delegator, who has funds deposited into the Registry and is part of the SHARP-P2P network, initiates a job. They define the job, which consists of a Job Header and a Job Body. The Job Header contains basic information about the task, such as its reward and its hash, while the Job Body contains the Cairo program to be executed.
+1. **Delegator Initiates Job**: The Delegator, who has funds deposited into the Registry and is part of the Zetina network, initiates a job. They define the job, which consists of a Job Header and a Job Body. The Job Header contains basic information about the task, such as its reward and its hash, while the Job Body contains the Cairo program to be executed.
 
 2. **Storage in Peer-to-Peer Network**: The Delegator signs and stores the Job Body in a Distributed Hash Table (DHT) within the peer-to-peer network. Simultaneously, they sign the Job Header and send it to the peer-to-peer network using a gossip-sub message.
 
@@ -14,6 +14,6 @@ We will explore the job pathway as it goes from Delegator to Executor via the pe
 
 6. **Submission to Registry and Receiving Reward**: The Executor promptly submits the job to the Registry. The Registry verifies the signature of the Delegator, the hash of the job, and the job proof of correctness. If all criteria are met, the Registry sends the funds as a reward. The Delegator subscribes to the Registry contract events and, when a job is successfully registered, the output of the job is emitted.
 
-To sum up, the Delegator pays the Executor for doing their job in a way that is safe and sound for both parties of the SHARP-P2P network.
+To sum up, the Delegator pays the Executor for doing their job in a way that is safe and sound for both parties of the Zetina network.
 
 ![Architecture](architecture.svg)

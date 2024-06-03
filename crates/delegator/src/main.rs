@@ -2,21 +2,6 @@
 
 use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
-use sharp_p2p_common::{
-    graceful_shutdown::shutdown_signal,
-    hash,
-    job::Job,
-    network::Network,
-    node_account::NodeAccount,
-    process::Process,
-    topic::{gossipsub_ident_topic, Topic},
-};
-use sharp_p2p_compiler::{
-    cairo_compiler::{tests::models::fixture, CairoCompiler},
-    errors::CompilerControllerError,
-    traits::CompilerController,
-};
-use sharp_p2p_peer::{registry::RegistryHandler, swarm::SwarmRunner};
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use tokio::{
@@ -25,6 +10,21 @@ use tokio::{
 };
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
+use zetina_common::{
+    graceful_shutdown::shutdown_signal,
+    hash,
+    job::Job,
+    network::Network,
+    node_account::NodeAccount,
+    process::Process,
+    topic::{gossipsub_ident_topic, Topic},
+};
+use zetina_compiler::{
+    cairo_compiler::{tests::models::fixture, CairoCompiler},
+    errors::CompilerControllerError,
+    traits::CompilerController,
+};
+use zetina_peer::{registry::RegistryHandler, swarm::SwarmRunner};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
