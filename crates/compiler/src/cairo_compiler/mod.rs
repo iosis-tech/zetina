@@ -1,10 +1,7 @@
 use crate::{errors::CompilerControllerError, traits::CompilerController};
 use async_process::Stdio;
 use futures::Future;
-use rand::{thread_rng, Rng};
-use serde_json::json;
 use starknet::signers::SigningKey;
-use std::io::Write;
 use std::path::PathBuf;
 use std::{io::Read, pin::Pin};
 use tempfile::NamedTempFile;
@@ -30,7 +27,7 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
     fn run(
         &self,
         program_path: PathBuf,
-        _program_input_path: PathBuf,
+        program_input_path: PathBuf,
     ) -> Result<Process<Result<Job, CompilerControllerError>>, CompilerControllerError> {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
         let future: Pin<Box<dyn Future<Output = Result<Job, CompilerControllerError>> + '_>> =
@@ -66,18 +63,6 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
                     }
                 }
 
-                // TODO remove it is just to make every job a little diffirent for testing purposes
-                let mut random_input = NamedTempFile::new()?;
-                let mut rng = thread_rng();
-                random_input.write_all(
-                    json!({
-                        "fibonacci_claim_index": rng.gen_range(10..10000)
-                    })
-                    .to_string()
-                    .as_bytes(),
-                )?;
-
-                // output
                 let mut cairo_pie = NamedTempFile::new()?;
 
                 let mut task = Command::new("cairo-run")
@@ -86,7 +71,7 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
                     .arg("--layout")
                     .arg(layout)
                     .arg("--program_input")
-                    .arg(random_input.path())
+                    .arg(program_input_path)
                     .arg("--cairo_pie_output")
                     .arg(cairo_pie.path())
                     .arg("--print_output")
@@ -112,7 +97,6 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
                     }
                 }
 
-                // cairo run had finished
                 let mut cairo_pie_compressed = Vec::new();
                 cairo_pie.read_to_end(&mut cairo_pie_compressed)?;
 

@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package delegator;
+
+service DelegatorService {
+  rpc delegate(DelegateRequest) returns (DelegateResponse) {}
+}
+
+message DelegateRequest { string name = 1; }
+message DelegateResponse { string message = 1; }

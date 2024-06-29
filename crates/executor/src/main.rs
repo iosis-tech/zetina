@@ -1,14 +1,12 @@
-#![deny(unused_crate_dependencies)]
+pub mod swarm;
 
 use futures::{stream::FuturesUnordered, StreamExt};
 use libp2p::gossipsub::Event;
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use std::hash::{DefaultHasher, Hash, Hasher};
-use tokio::{
-    io::{stdin, AsyncBufReadExt, BufReader},
-    sync::mpsc,
-};
-use tracing::{debug, info};
+use swarm::SwarmRunner;
+use tokio::sync::mpsc;
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
     graceful_shutdown::shutdown_signal,
@@ -22,7 +20,6 @@ use zetina_common::{
     process::Process,
     topic::{gossipsub_ident_topic, Topic},
 };
-use zetina_peer::{registry::RegistryHandler, swarm::SwarmRunner};
 use zetina_prover::{
     errors::ProverControllerError, stone_prover::StoneProver, traits::ProverController,
 };
@@ -50,8 +47,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
     let url = "https://starknet-sepolia.public.blastapi.io";
 
-    let mut registry_handler =
-        RegistryHandler::new(JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)));
     let node_account = NodeAccount::new(
         private_key,
         account_address,
@@ -62,15 +57,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
     let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
+    let finished_job_topic = gossipsub_ident_topic(network, Topic::FinishedJob);
 
     let mut swarm_runner = SwarmRunner::new(
         node_account.get_keypair(),
         &[new_job_topic, picked_job_topic.to_owned()],
     )?;
 
-    let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
-    let mut message_stream = swarm_runner.run(picked_job_topic, send_topic_rx);
-    let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
+    let (send_picked_job_topic_tx, send_picked_job_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
+    let (send_finished_job_topic_tx, send_finished_job_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
+    let mut message_stream = swarm_runner.run(
+        picked_job_topic,
+        send_picked_job_topic_rx,
+        finished_job_topic,
+        send_finished_job_topic_rx,
+    );
 
     let verifying_key = node_account.get_verifying_key();
     let runner = CairoRunner::new(bootloader_program_path, &verifying_key);
@@ -82,14 +83,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut prover_scheduler =
         FuturesUnordered::<Process<'_, Result<JobWitness, ProverControllerError>>>::new();
 
-    // Read full lines from stdin
-    let mut stdin = BufReader::new(stdin()).lines();
-
     loop {
         tokio::select! {
-            Ok(Some(line)) = stdin.next_line() => {
-                send_topic_tx.send(line.as_bytes().to_vec()).await?;
-            },
             Some(event) = message_stream.next() => {
                 match event {
                     Event::Message { message, .. } => {
@@ -116,15 +111,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 }
             },
-            Some(Ok(event_vec)) = event_stream.next() => {
-                debug!("{:?}", event_vec);
-            },
             Some(Ok(job_trace)) = runner_scheduler.next() => {
                 info!("Scheduled proving of job_trace: {}", hash!(&job_trace));
                 prover_scheduler.push(prover.run(job_trace)?);
             },
             Some(Ok(job_witness)) = prover_scheduler.next() => {
                 info!("Calculated job_witness: {}", hash!(&job_witness));
+                let serialized_job_witness = serde_json::to_string(&job_witness)?;
+                send_finished_job_topic_tx.send(serialized_job_witness.into()).await?;
             },
             _ = shutdown_signal() => {
                 break
@@ -137,7 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             if let Some(job) = job_record.take_job().await {
                 let serialized_job = serde_json::to_string(&job)?;
-                send_topic_tx.send(serialized_job.into()).await?;
+                send_picked_job_topic_tx.send(serialized_job.into()).await?;
                 info!("Sent picked job event: {}", hash!(&job));
 
                 info!("Scheduled run of job: {}", hash!(&job));

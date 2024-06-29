@@ -5,7 +5,6 @@ use self::types::{
 use crate::{errors::ProverControllerError, traits::ProverController};
 use async_process::Stdio;
 use futures::Future;
-use itertools::{chain, Itertools};
 use serde_json::Value;
 use std::{
     fs,
@@ -16,9 +15,7 @@ use std::{
 use tempfile::NamedTempFile;
 use tokio::{process::Command, select, sync::mpsc};
 use tracing::debug;
-use zetina_common::{
-    argvec::ArgVec, hash, job_trace::JobTrace, job_witness::JobWitness, process::Process,
-};
+use zetina_common::{hash, job_trace::JobTrace, job_witness::JobWitness, process::Process};
 
 pub mod tests;
 pub mod types;
@@ -90,26 +87,8 @@ impl ProverController for StoneProver {
                     }
                 }
 
-                let mut raw_proof = String::new();
-                out_file.read_to_string(&mut raw_proof)?;
-
-                let parsed_proof = cairo_proof_parser::parse(raw_proof)
-                    .map_err(|e| ProverControllerError::ProofParseError(e.to_string()))?;
-
-                let config: ArgVec = serde_json::from_str(&parsed_proof.config.to_string())?;
-                let public_input: ArgVec =
-                    serde_json::from_str(&parsed_proof.public_input.to_string())?;
-                let unsent_commitment: ArgVec =
-                    serde_json::from_str(&parsed_proof.unsent_commitment.to_string())?;
-                let witness: ArgVec = serde_json::from_str(&parsed_proof.witness.to_string())?;
-
-                let proof = chain!(
-                    config.into_iter(),
-                    public_input.into_iter(),
-                    unsent_commitment.into_iter(),
-                    witness.into_iter()
-                )
-                .collect_vec();
+                let mut proof = Vec::new();
+                out_file.read_to_end(&mut proof)?;
 
                 Ok(JobWitness { proof })
             });

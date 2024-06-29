@@ -23,3 +23,5 @@ tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 starknet.workspace = true
+async-stream.workspace = true
+tokio-util.workspace = true
