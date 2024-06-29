@@ -2,11 +2,13 @@ pub mod delegator;
 pub mod swarm;
 pub mod tonic;
 
+use ::tonic::transport::Server;
 use delegator::Delegator;
 use libp2p::gossipsub;
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use swarm::SwarmRunner;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
+use tonic::{proto::delegator_service_server::DelegatorServiceServer, DelegatorGRPCServer};
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
     job_witness::JobWitness,
@@ -40,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let finished_job_topic = gossipsub_ident_topic(network, Topic::FinishedJob);
 
     let (swarm_events_tx, swarm_events_rx) = mpsc::channel::<gossipsub::Event>(100);
-    let (job_witness_tx, job_witness_rx) = mpsc::channel::<JobWitness>(100);
+    let (job_witness_tx, job_witness_rx) = broadcast::channel::<JobWitness>(100);
 
     let (new_job_topic_tx, new_job_topic_rx) = mpsc::channel::<Vec<u8>>(100);
 
@@ -51,12 +53,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         swarm_events_tx,
     )?;
 
-    Delegator::new(
-        node_account.get_signing_key(),
+    Delegator::new(job_witness_tx, swarm_events_rx);
+
+    let server = DelegatorGRPCServer::new(
+        node_account.get_signing_key().to_owned(),
         new_job_topic_tx,
-        job_witness_tx,
-        swarm_events_rx,
+        job_witness_rx,
     );
+
+    Server::builder()
+        .add_service(DelegatorServiceServer::new(server))
+        .serve("[::1]:50051".parse().unwrap())
+        .await?;
 
     Ok(())
 }

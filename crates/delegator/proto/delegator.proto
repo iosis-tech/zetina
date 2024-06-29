@@ -3,8 +3,8 @@ syntax = "proto3";
 package delegator;
 
 service DelegatorService {
-  rpc delegate(DelegateRequest) returns (DelegateResponse) {}
+  rpc Delegator(stream DelegateRequest) returns (stream DelegateResponse) {}
 }
 
-message DelegateRequest { string name = 1; }
-message DelegateResponse { string message = 1; }
+message DelegateRequest { bytes cairo_pie = 1; }
+message DelegateResponse { bytes proof = 1; }

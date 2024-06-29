@@ -77,8 +77,6 @@ impl SwarmRunner {
 
         Ok(gossipsub::Behaviour::new(message_authenticity, config)?)
     }
-
-    pub async fn run() {}
 }
 
 impl Drop for SwarmRunner {

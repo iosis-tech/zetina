@@ -1,6 +1,6 @@
 use libp2p::gossipsub::Event;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 use zetina_common::{
@@ -13,7 +13,7 @@ use zetina_common::{
 
 pub async fn delegator_loop(
     mut message_stream: mpsc::Receiver<Event>,
-    job_witness_tx: mpsc::Sender<JobWitness>,
+    job_witness_tx: broadcast::Sender<JobWitness>,
     cancellation_token: CancellationToken,
 ) {
     loop {
@@ -35,7 +35,7 @@ pub async fn delegator_loop(
                         if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::FinishedJob).into() {
                             let job_witness: JobWitness = serde_json::from_slice(&message.data).unwrap();
                             info!("Received finished job event: {}", hash!(&job_witness));
-                            job_witness_tx.send(job_witness).await.unwrap();
+                            job_witness_tx.send(job_witness).unwrap();
                         }
                     },
                     Event::Subscribed { peer_id, topic } => {
