@@ -61,7 +61,6 @@ class JobData(Task):
     reward: int
     num_of_steps: int
     cairo_pie_compressed: FieldElementsData
-    registry_address: int
 
     def load_task(self) -> "CairoPieTask":
         return CairoPieTask(

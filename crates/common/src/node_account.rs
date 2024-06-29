@@ -17,8 +17,6 @@ where
     /// The account for the StarkNet network.
     /// This account is used to interact with the Registry contract.
     account: SingleOwnerAccount<P, LocalWallet>,
-    ///
-    ///
     signing_key: SigningKey,
 }
 

@@ -8,7 +8,7 @@ use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
     sync::mpsc,
 };
-use tracing::{debug, info};
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
     graceful_shutdown::shutdown_signal,
@@ -24,7 +24,7 @@ use zetina_compiler::{
     errors::CompilerControllerError,
     traits::CompilerController,
 };
-use zetina_peer::{registry::RegistryHandler, swarm::SwarmRunner};
+use zetina_peer::swarm::SwarmRunner;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,9 +38,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
     let url = "https://starknet-sepolia.public.blastapi.io";
 
-    let mut registry_handler =
-        RegistryHandler::new(JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)));
-    let registry_address = registry_handler.get_registry_address();
     let node_account = NodeAccount::new(
         private_key,
         account_address,
@@ -59,9 +56,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
     let mut message_stream = swarm_runner.run(new_job_topic, send_topic_rx);
-    let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
 
-    let compiler = CairoCompiler::new(node_account.get_signing_key(), registry_address);
+    let compiler = CairoCompiler::new(node_account.get_signing_key());
 
     let mut compiler_scheduler =
         FuturesUnordered::<Process<'_, Result<Job, CompilerControllerError>>>::new();
@@ -101,9 +97,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     },
                     _ => {}
                 }
-            },
-            Some(Ok(event_vec)) = event_stream.next() => {
-                debug!("{:?}", event_vec);
             },
             Some(Ok(job)) = compiler_scheduler.next() => {
                 let serialized_job = serde_json::to_string(&job).unwrap();

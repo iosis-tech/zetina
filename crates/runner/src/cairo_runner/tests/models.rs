@@ -2,7 +2,6 @@ use rand::{thread_rng, Rng};
 use zetina_common::job::{Job, JobData};
 
 use starknet::signers::SigningKey;
-use starknet_crypto::FieldElement;
 use std::{env, fs, path::PathBuf};
 
 pub struct TestFixture {
@@ -20,7 +19,7 @@ pub fn fixture() -> TestFixture {
 
     TestFixture {
         job: Job::try_from_job_data(
-            JobData::new(rng.gen(), fs::read(cairo_pie_path).unwrap(), FieldElement::ZERO),
+            JobData::new(rng.gen(), fs::read(cairo_pie_path).unwrap()),
             &SigningKey::from_random(),
         ),
         program_path,

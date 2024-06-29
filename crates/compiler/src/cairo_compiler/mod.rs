@@ -4,7 +4,6 @@ use futures::Future;
 use rand::{thread_rng, Rng};
 use serde_json::json;
 use starknet::signers::SigningKey;
-use starknet_crypto::FieldElement;
 use std::io::Write;
 use std::path::PathBuf;
 use std::{io::Read, pin::Pin};
@@ -19,12 +18,11 @@ pub mod tests;
 
 pub struct CairoCompiler<'identity> {
     signing_key: &'identity SigningKey,
-    registry_contract: FieldElement,
 }
 
 impl<'identity> CairoCompiler<'identity> {
-    pub fn new(signing_key: &'identity SigningKey, registry_contract: FieldElement) -> Self {
-        Self { signing_key, registry_contract }
+    pub fn new(signing_key: &'identity SigningKey) -> Self {
+        Self { signing_key }
     }
 }
 
@@ -118,10 +116,7 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
                 let mut cairo_pie_compressed = Vec::new();
                 cairo_pie.read_to_end(&mut cairo_pie_compressed)?;
 
-                Ok(Job::try_from_job_data(
-                    JobData::new(0, cairo_pie_compressed, self.registry_contract),
-                    self.signing_key,
-                ))
+                Ok(Job::try_from_job_data(JobData::new(0, cairo_pie_compressed), self.signing_key))
             });
 
         Ok(Process::new(future, terminate_tx))
