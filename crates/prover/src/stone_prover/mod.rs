@@ -34,64 +34,65 @@ impl ProverController for StoneProver {
         job_trace: JobTrace,
     ) -> Result<Process<Result<JobWitness, ProverControllerError>>, ProverControllerError> {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
-        let future: Pin<Box<dyn Future<Output = Result<JobWitness, ProverControllerError>> + '_>> =
-            Box::pin(async move {
-                let mut out_file = NamedTempFile::new()?;
+        let future: Pin<
+            Box<dyn Future<Output = Result<JobWitness, ProverControllerError>> + Send + '_>,
+        > = Box::pin(async move {
+            let mut out_file = NamedTempFile::new()?;
 
-                let mut cpu_air_prover_config = NamedTempFile::new()?;
-                let mut cpu_air_params = NamedTempFile::new()?;
+            let mut cpu_air_prover_config = NamedTempFile::new()?;
+            let mut cpu_air_params = NamedTempFile::new()?;
 
-                let n_steps: u64 = serde_json::from_str::<Value>(
-                    fs::read_to_string(job_trace.air_public_input.path())?.as_str(),
-                )?["n_steps"]
-                    .as_u64()
-                    .ok_or(ProverControllerError::NumberOfStepsUnavailable)?;
+            let n_steps: u64 = serde_json::from_str::<Value>(
+                fs::read_to_string(job_trace.air_public_input.path())?.as_str(),
+            )?["n_steps"]
+                .as_u64()
+                .ok_or(ProverControllerError::NumberOfStepsUnavailable)?;
 
-                cpu_air_prover_config
-                    .write_all(&serde_json::to_string(&config(n_steps))?.into_bytes())?;
-                cpu_air_params.write_all(&serde_json::to_string(&params(n_steps))?.into_bytes())?;
+            cpu_air_prover_config
+                .write_all(&serde_json::to_string(&config(n_steps))?.into_bytes())?;
+            cpu_air_params.write_all(&serde_json::to_string(&params(n_steps))?.into_bytes())?;
 
-                let mut task = Command::new("cpu_air_prover")
-                    .arg("--out_file")
-                    .arg(out_file.path())
-                    .arg("--private_input_file")
-                    .arg(job_trace.air_private_input.path())
-                    .arg("--public_input_file")
-                    .arg(job_trace.air_public_input.path())
-                    .arg("--prover_config_file")
-                    .arg(cpu_air_prover_config.path())
-                    .arg("--parameter_file")
-                    .arg(cpu_air_params.path())
-                    .arg("--generate_annotations")
-                    .stdout(Stdio::null())
-                    .spawn()?;
+            let mut task = Command::new("cpu_air_prover")
+                .arg("--out_file")
+                .arg(out_file.path())
+                .arg("--private_input_file")
+                .arg(job_trace.air_private_input.path())
+                .arg("--public_input_file")
+                .arg(job_trace.air_public_input.path())
+                .arg("--prover_config_file")
+                .arg(cpu_air_prover_config.path())
+                .arg("--parameter_file")
+                .arg(cpu_air_params.path())
+                .arg("--generate_annotations")
+                .stdout(Stdio::null())
+                .spawn()?;
 
-                let job_trace_hash = hash!(job_trace);
+            let job_trace_hash = hash!(job_trace);
 
-                debug!("task {} spawned", job_trace_hash);
+            debug!("task {} spawned", job_trace_hash);
 
-                loop {
-                    select! {
-                        output = task.wait() => {
-                            debug!("{:?}", output);
-                            if !output?.success() {
-                                return Err(ProverControllerError::TaskTerminated);
-                            }
-                            let output = task.wait_with_output().await?;
-                            debug!("{:?}", output);
-                            break;
+            loop {
+                select! {
+                    output = task.wait() => {
+                        debug!("{:?}", output);
+                        if !output?.success() {
+                            return Err(ProverControllerError::TaskTerminated);
                         }
-                        Some(()) = terminate_rx.recv() => {
-                            task.start_kill()?;
-                        }
+                        let output = task.wait_with_output().await?;
+                        debug!("{:?}", output);
+                        break;
+                    }
+                    Some(()) = terminate_rx.recv() => {
+                        task.start_kill()?;
                     }
                 }
+            }
 
-                let mut proof = Vec::new();
-                out_file.read_to_end(&mut proof)?;
+            let mut proof = Vec::new();
+            out_file.read_to_end(&mut proof)?;
 
-                Ok(JobWitness { proof })
-            });
+            Ok(JobWitness { proof })
+        });
 
         Ok(Process::new(future, terminate_tx))
     }

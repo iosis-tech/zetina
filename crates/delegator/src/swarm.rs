@@ -83,7 +83,9 @@ impl Drop for SwarmRunner {
     fn drop(&mut self) {
         self.cancellation_token.cancel();
         block_on(async move {
-            self.handle.take().unwrap().await.unwrap();
+            if let Some(handle) = self.handle.take() {
+                handle.await.unwrap();
+            }
         })
     }
 }

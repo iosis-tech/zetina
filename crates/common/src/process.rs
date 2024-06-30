@@ -3,13 +3,13 @@ use std::pin::Pin;
 use tokio::sync::mpsc;
 
 pub struct Process<'future, PR> {
-    future: Pin<Box<dyn Future<Output = PR> + 'future>>,
+    future: Pin<Box<dyn Future<Output = PR> + Send + 'future>>,
     abort: mpsc::Sender<()>,
 }
 
 impl<'future, PR> Process<'future, PR> {
     pub fn new(
-        future: Pin<Box<dyn Future<Output = PR> + 'future>>,
+        future: Pin<Box<dyn Future<Output = PR> + Send + 'future>>,
         abort: mpsc::Sender<()>,
     ) -> Self {
         Self { future, abort }

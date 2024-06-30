@@ -1,32 +1,35 @@
-use async_stream::stream;
-use futures::stream::Stream;
-use libp2p::futures::StreamExt;
+pub mod event_loop;
+
+use event_loop::swarm_loop;
+use futures::executor::block_on;
+use futures::FutureExt;
 use libp2p::gossipsub::{self, IdentTopic};
 use libp2p::identity::Keypair;
-use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
-use libp2p::{mdns, noise, tcp, yamux, Swarm, SwarmBuilder};
+use libp2p::swarm::NetworkBehaviour;
+use libp2p::{mdns, noise, tcp, yamux, SwarmBuilder};
 use std::error::Error;
-use std::pin::Pin;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error};
 
 #[derive(NetworkBehaviour)]
-struct PeerBehaviour {
+pub struct PeerBehaviour {
     gossipsub: gossipsub::Behaviour,
     mdns: mdns::tokio::Behaviour,
 }
 
 pub struct SwarmRunner {
-    swarm: Swarm<PeerBehaviour>,
     cancellation_token: CancellationToken,
+    handle: Option<JoinHandle<()>>,
 }
 
 impl SwarmRunner {
     pub fn new(
         p2p_local_keypair: &Keypair,
-        subscribe_topics: &[IdentTopic],
+        subscribe_topics: Vec<IdentTopic>,
+        transmit_topics: Vec<(IdentTopic, mpsc::Receiver<Vec<u8>>)>,
+        swarm_events_tx: mpsc::Sender<gossipsub::Event>,
     ) -> Result<Self, Box<dyn Error>> {
         let mdns = mdns::tokio::Behaviour::new(
             mdns::Config::default(),
@@ -44,13 +47,22 @@ impl SwarmRunner {
             .build();
 
         for topic in subscribe_topics {
-            swarm.behaviour_mut().gossipsub.subscribe(topic)?;
+            swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
         }
 
         swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
 
-        Ok(SwarmRunner { swarm, cancellation_token: CancellationToken::new() })
+        let cancellation_token = CancellationToken::new();
+
+        Ok(SwarmRunner {
+            cancellation_token: cancellation_token.to_owned(),
+            handle: Some(tokio::spawn(async move {
+                swarm_loop(swarm, transmit_topics, swarm_events_tx, cancellation_token)
+                    .boxed()
+                    .await
+            })),
+        })
     }
 
     fn init_gossip(p2p_local_keypair: &Keypair) -> Result<gossipsub::Behaviour, Box<dyn Error>> {
@@ -65,70 +77,15 @@ impl SwarmRunner {
 
         Ok(gossipsub::Behaviour::new(message_authenticity, config)?)
     }
-
-    pub fn run(
-        &mut self,
-        send_topic1: IdentTopic,
-        mut send_topic_rx1: mpsc::Receiver<Vec<u8>>,
-        send_topic2: IdentTopic,
-        mut send_topic_rx2: mpsc::Receiver<Vec<u8>>,
-    ) -> Pin<Box<impl Stream<Item = gossipsub::Event> + '_>> {
-        let stream = stream! {
-            loop {
-                tokio::select! {
-                    Some(data) = send_topic_rx1.recv() => {
-                        debug!("Publishing to topic: {:?}", send_topic1);
-                        if let Err(e) = self.swarm
-                            .behaviour_mut().gossipsub
-                            .publish(send_topic1.clone(), data) {
-                            error!("Publish error: {e:?}");
-                        }
-                    },
-                    Some(data) = send_topic_rx2.recv() => {
-                        debug!("Publishing to topic: {:?}", send_topic2);
-                        if let Err(e) = self.swarm
-                            .behaviour_mut().gossipsub
-                            .publish(send_topic2.clone(), data) {
-                            error!("Publish error: {e:?}");
-                        }
-                    },
-                    event = self.swarm.select_next_some() => match event {
-                        SwarmEvent::Behaviour(PeerBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                            for (peer_id, _multiaddr) in list {
-                                debug!("mDNS discovered a new peer: {peer_id}");
-                                self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-                            }
-                        },
-                        SwarmEvent::Behaviour(PeerBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                            for (peer_id, _multiaddr) in list {
-                                debug!("mDNS discover peer has expired: {peer_id}");
-                                self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                            }
-                        },
-                        SwarmEvent::Behaviour(PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message {
-                            propagation_source,
-                            message_id,
-                            message,
-                        })) => {
-                            yield gossipsub::Event::Message { propagation_source, message_id, message };
-                        },
-                        SwarmEvent::NewListenAddr { address, .. } => {
-                            debug!("Local node is listening on {address}");
-                        }
-                        _ => {}
-                    },
-                    _ = self.cancellation_token.cancelled() => {
-                        break
-                    }
-                }
-            }
-        };
-        Box::pin(stream)
-    }
 }
 
 impl Drop for SwarmRunner {
     fn drop(&mut self) {
         self.cancellation_token.cancel();
+        block_on(async move {
+            if let Some(handle) = self.handle.take() {
+                handle.await.unwrap();
+            }
+        })
     }
 }

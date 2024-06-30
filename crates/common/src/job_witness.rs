@@ -12,9 +12,15 @@ use std::{
     This serialized proof can be deserialized into a StarkProof object by the verifier to proceed with the verification of the statement.
 */
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct JobWitness {
     pub proof: Vec<u8>, // Serialized proof
+}
+
+impl Hash for JobWitness {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.proof.hash(state);
+    }
 }
 
 impl Display for JobWitness {
