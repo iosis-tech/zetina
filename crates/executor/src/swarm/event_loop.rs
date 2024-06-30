@@ -1,3 +1,5 @@
+use super::PeerBehaviour;
+use crate::swarm::PeerBehaviourEvent;
 use futures::StreamExt;
 use libp2p::{
     gossipsub::{self, IdentTopic},
@@ -8,10 +10,6 @@ use libp2p::{
 use tokio::sync::mpsc::{self, Receiver};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
-
-use crate::swarm::PeerBehaviourEvent;
-
-use super::PeerBehaviour;
 
 pub(crate) async fn swarm_loop(
     mut swarm: Swarm<PeerBehaviour>,

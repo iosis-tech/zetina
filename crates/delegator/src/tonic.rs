@@ -1,6 +1,13 @@
+pub mod proto {
+    tonic::include_proto!("delegator");
+}
+use proto::delegator_service_server::DelegatorService;
+use proto::{DelegateRequest, DelegateResponse};
+
 use async_stream::stream;
 use futures::{Stream, StreamExt, TryStreamExt};
 use starknet::signers::SigningKey;
+use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::pin::Pin;
 use tokio::{
@@ -14,12 +21,6 @@ use zetina_common::{
     job::{Job, JobData},
     job_witness::JobWitness,
 };
-
-pub mod proto {
-    tonic::include_proto!("delegator");
-}
-use crate::tonic::proto::delegator_service_server::DelegatorService;
-use proto::{DelegateRequest, DelegateResponse};
 
 pub struct DelegatorGRPCServer {
     signing_key: SigningKey,
@@ -50,18 +51,23 @@ impl DelegatorService for DelegatorGRPCServer {
         let mut witness_channel = self.job_witness_rx.resubscribe();
         let signing_key = self.signing_key.clone();
 
+        let mut queue_set = HashSet::<u64>::new();
+
         let out_stream = stream! {
             loop {
                 select! {
                     Ok(request) = in_stream.select_next_some() => {
                         let job_data = JobData::new(0, request.cairo_pie);
                         let job = Job::try_from_job_data(job_data, &signing_key);
+                        queue_set.insert(hash!(job));
                         let serialized_job = serde_json::to_string(&job).unwrap();
                         job_channel.send(serialized_job.into()).await.unwrap();
                         info!("Sent a new job: {}", hash!(&job));
                     }
                     Ok(rx) = witness_channel.recv() => {
-                        yield Ok(DelegateResponse { proof: rx.proof })
+                        if let Some(job_hash) = queue_set.take(&rx.job_hash) {
+                            yield Ok(DelegateResponse { job_hash, proof: rx.proof })
+                        }
                     }
                     else => {
                         yield Err(Status::cancelled(""))

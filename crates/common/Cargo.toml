@@ -13,6 +13,7 @@ publish = true
 
 [dependencies]
 cairo-vm.workspace = true
+rand.workspace = true
 futures.workspace = true
 hex.workspace = true
 libp2p.workspace = true

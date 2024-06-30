@@ -95,7 +95,7 @@ impl RunnerController for CairoRunner {
                     }
                 }
             }
-            Ok(JobTrace { air_public_input, air_private_input, memory, trace })
+            Ok(JobTrace { job_hash, air_public_input, air_private_input, memory, trace })
         });
 
         Ok(Process::new(future, terminate_tx))

@@ -14,6 +14,7 @@ use std::{
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct JobWitness {
+    pub job_hash: u64,
     pub proof: Vec<u8>, // Serialized proof
 }
 

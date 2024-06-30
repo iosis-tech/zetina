@@ -91,7 +91,7 @@ impl ProverController for StoneProver {
             let mut proof = Vec::new();
             out_file.read_to_end(&mut proof)?;
 
-            Ok(JobWitness { proof })
+            Ok(JobWitness { job_hash: job_trace.job_hash, proof })
         });
 
         Ok(Process::new(future, terminate_tx))

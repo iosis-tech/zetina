@@ -1,5 +1,7 @@
 use std::{collections::BTreeSet, hash::Hash};
 
+use rand::Rng;
+
 pub struct JobRecord<J> {
     ordered_set: BTreeSet<J>,
 }
@@ -21,6 +23,12 @@ where
     }
 
     pub async fn take_job(&mut self) -> Option<J> {
+        // add random wait to simulate network overhead
+        let random = {
+            let mut rng = rand::thread_rng();
+            rng.gen_range(0..1000)
+        };
+        tokio::time::sleep(std::time::Duration::from_millis(random)).await;
         self.ordered_set.pop_last()
     }
 

@@ -27,5 +27,13 @@ pub fn fixture() -> TestFixture {
     let mut trace = NamedTempFile::new().unwrap();
     trace.write_all(&fs::read(trace_path).unwrap()).unwrap();
 
-    TestFixture { job_trace: JobTrace { air_public_input, air_private_input, memory, trace } }
+    TestFixture {
+        job_trace: JobTrace {
+            job_hash: u64::default(),
+            air_public_input,
+            air_private_input,
+            memory,
+            trace,
+        },
+    }
 }
