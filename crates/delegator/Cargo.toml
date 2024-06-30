@@ -28,6 +28,7 @@ async-stream.workspace = true
 tokio-util.workspace = true
 tokio-stream.workspace = true
 thiserror.workspace = true
+tonic-health.workspace = true
 
 [build-dependencies]
 tonic-build.workspace = true

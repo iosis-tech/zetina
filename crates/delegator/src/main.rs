@@ -11,6 +11,7 @@ use tokio::sync::{broadcast, mpsc};
 use tonic::{proto::delegator_service_server::DelegatorServiceServer, DelegatorGRPCServer};
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
+    graceful_shutdown::shutdown_signal,
     job_witness::JobWitness,
     network::Network,
     node_account::NodeAccount,
@@ -61,9 +62,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         job_witness_rx,
     );
 
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter.set_serving::<DelegatorServiceServer<DelegatorGRPCServer>>().await;
+
     Server::builder()
+        .add_service(health_service)
         .add_service(DelegatorServiceServer::new(server))
-        .serve("[::1]:50051".parse().unwrap())
+        .serve_with_shutdown("0.0.0.0:50051".parse().unwrap(), shutdown_signal())
         .await?;
 
     Ok(())

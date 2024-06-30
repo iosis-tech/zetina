@@ -23,6 +23,13 @@ tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 starknet.workspace = true
+tonic.workspace = true
+prost.workspace = true
 async-stream.workspace = true
 tokio-util.workspace = true
+tokio-stream.workspace = true
 thiserror.workspace = true
+tonic-health.workspace = true
+
+[build-dependencies]
+tonic-build.workspace = true

@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package executor;
+
+service ExecutorService {
+  rpc Executor(ExecutorRequest) returns (ExecutorResponse) {}
+}
+
+message ExecutorRequest { string msg = 1; }
+message ExecutorResponse { string msg = 1; }

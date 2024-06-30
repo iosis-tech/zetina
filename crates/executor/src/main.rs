@@ -1,13 +1,17 @@
 pub mod executor;
 pub mod swarm;
+pub mod tonic;
 
+use ::tonic::transport::Server;
 use executor::Executor;
 use libp2p::gossipsub::{self};
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use swarm::SwarmRunner;
 use tokio::sync::mpsc;
+use tonic::{proto::executor_service_server::ExecutorServiceServer, ExecutorGRPCServer};
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
+    graceful_shutdown::shutdown_signal,
     network::Network,
     node_account::NodeAccount,
     topic::{gossipsub_ident_topic, Topic},
@@ -64,6 +68,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let prover = StoneProver::new();
 
     Executor::new(swarm_events_rx, finished_job_topic_tx, picked_job_topic_tx, runner, prover);
+
+    let server = ExecutorGRPCServer::default();
+
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter.set_serving::<ExecutorServiceServer<ExecutorGRPCServer>>().await;
+
+    Server::builder()
+        .add_service(health_service)
+        .add_service(ExecutorServiceServer::new(server))
+        .serve_with_shutdown("0.0.0.0:50052".parse().unwrap(), shutdown_signal())
+        .await?;
 
     Ok(())
 }

@@ -11,7 +11,6 @@ use std::error::Error;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
 
 #[derive(NetworkBehaviour)]
 pub struct PeerBehaviour {
@@ -20,7 +19,6 @@ pub struct PeerBehaviour {
 }
 
 pub struct SwarmRunner {
-    cancellation_token: CancellationToken,
     handle: Option<JoinHandle<()>>,
 }
 
@@ -53,14 +51,9 @@ impl SwarmRunner {
         swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
 
-        let cancellation_token = CancellationToken::new();
-
         Ok(SwarmRunner {
-            cancellation_token: cancellation_token.to_owned(),
             handle: Some(tokio::spawn(async move {
-                swarm_loop(swarm, transmit_topics, swarm_events_tx, cancellation_token)
-                    .boxed()
-                    .await
+                swarm_loop(swarm, transmit_topics, swarm_events_tx).boxed().await
             })),
         })
     }
@@ -81,7 +74,6 @@ impl SwarmRunner {
 
 impl Drop for SwarmRunner {
     fn drop(&mut self) {
-        self.cancellation_token.cancel();
         block_on(async move {
             if let Some(handle) = self.handle.take() {
                 handle.await.unwrap();

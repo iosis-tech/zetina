@@ -8,14 +8,13 @@ use libp2p::{
     Swarm,
 };
 use tokio::sync::mpsc::{self, Receiver};
-use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
+use zetina_common::graceful_shutdown::shutdown_signal;
 
 pub(crate) async fn swarm_loop(
     mut swarm: Swarm<PeerBehaviour>,
     mut transmit_topics: Vec<(IdentTopic, Receiver<Vec<u8>>)>,
     swarm_events_tx: mpsc::Sender<gossipsub::Event>,
-    cancellation_token: CancellationToken,
 ) {
     // TODO make it nicer solution, extensible not manual!
     let mut topic_one = transmit_topics.pop().unwrap();
@@ -63,7 +62,7 @@ pub(crate) async fn swarm_loop(
                 }
                 _ => {}
             },
-            _ = cancellation_token.cancelled() => {
+            _ = shutdown_signal() => {
                 break
             }
         }
