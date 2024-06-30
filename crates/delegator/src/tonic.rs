@@ -15,7 +15,7 @@ use tokio::{
     sync::{broadcast, mpsc},
 };
 use tonic::{Request, Response, Status, Streaming};
-use tracing::info;
+use tracing::{debug, info};
 use zetina_common::hash;
 use zetina_common::{
     job::{Job, JobData},
@@ -45,7 +45,7 @@ impl DelegatorService for DelegatorGRPCServer {
         &self,
         request: Request<Streaming<DelegateRequest>>,
     ) -> Result<Response<Self::DelegatorStream>, Status> {
-        println!("Got a request from {:?}", request.remote_addr());
+        info!("Got a request from {:?}", request.remote_addr());
         let mut in_stream = request.into_inner().into_stream().fuse();
         let job_channel = self.job_topic_tx.clone();
         let mut witness_channel = self.job_witness_rx.resubscribe();
@@ -65,7 +65,9 @@ impl DelegatorService for DelegatorGRPCServer {
                         info!("Sent a new job: {}", hash!(&job));
                     }
                     Ok(rx) = witness_channel.recv() => {
+                        debug!("Received job witness: {}", &rx.job_hash);
                         if let Some(job_hash) = queue_set.take(&rx.job_hash) {
+                            info!("Received awaited job witness: {}", &job_hash);
                             yield Ok(DelegateResponse { job_hash, proof: rx.proof })
                         }
                     }

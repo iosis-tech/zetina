@@ -15,8 +15,8 @@ async fn run_single_job() {
 
     let compiler_identity = SigningKey::from_random();
     let compiler = CairoCompiler::new(&compiler_identity);
-    let runner_identity = SigningKey::from_random().verifying_key();
-    let runner = CairoRunner::new(runner_fixture.program_path, &runner_identity);
+    let runner =
+        CairoRunner::new(runner_fixture.program_path, SigningKey::from_random().verifying_key());
 
     compiler
         .run(compiler_fixture.program_path, compiler_fixture.program_input_path)
@@ -38,8 +38,8 @@ async fn run_multiple_job() {
 
     let compiler_identity = SigningKey::from_random();
     let compiler = CairoCompiler::new(&compiler_identity);
-    let runner_identity = SigningKey::from_random().verifying_key();
-    let runner = CairoRunner::new(runner_fixture1.program_path, &runner_identity);
+    let runner =
+        CairoRunner::new(runner_fixture1.program_path, SigningKey::from_random().verifying_key());
 
     let mut futures = FuturesUnordered::new();
 

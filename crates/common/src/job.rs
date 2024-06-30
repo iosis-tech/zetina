@@ -21,9 +21,9 @@ use tempfile::NamedTempFile;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub job_data: JobData,
-    pub public_key: FieldElement, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
-    pub signature_r: FieldElement, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
-    pub signature_s: FieldElement, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
+    pub public_key: FieldElement, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relation
+    pub signature_r: FieldElement, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relation
+    pub signature_s: FieldElement, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relation
 }
 
 impl Job {
