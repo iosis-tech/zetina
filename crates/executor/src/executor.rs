@@ -1,11 +1,11 @@
+use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use futures::{executor::block_on, stream::FuturesUnordered};
 use libp2p::gossipsub::Event;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use tokio::{sync::mpsc, task::JoinHandle};
-use tokio_util::sync::CancellationToken;
 use tracing::info;
 use zetina_common::{
+    graceful_shutdown::shutdown_signal,
     hash,
     job::Job,
     job_record::JobRecord,
@@ -25,7 +25,6 @@ use zetina_runner::traits::RunnerController;
 const MAX_PARALLEL_JOBS: usize = 1;
 
 pub struct Executor {
-    cancellation_token: CancellationToken,
     handle: Option<JoinHandle<Result<(), ExecutorError>>>,
 }
 
@@ -37,10 +36,7 @@ impl Executor {
         runner: CairoRunner,
         prover: StoneProver,
     ) -> Self {
-        let cancellation_token = CancellationToken::new();
-
         Self {
-            cancellation_token: cancellation_token.to_owned(),
             handle: Some(tokio::spawn(async move {
                 let mut job_record = JobRecord::<Job>::new();
                 let mut runner_scheduler =
@@ -78,15 +74,15 @@ impl Executor {
                             }
                         },
                         Some(Ok(job_trace)) = runner_scheduler.next() => {
-                            info!("Scheduled proving of job_trace: {}", hash!(&job_trace));
+                            info!("Scheduled proving of job_trace: {}", &job_trace.job_hash);
                             prover_scheduler.push(prover.run(job_trace)?);
                         },
                         Some(Ok(job_witness)) = prover_scheduler.next() => {
-                            info!("Calculated job_witness: {}", hash!(&job_witness));
+                            info!("Calculated job_witness: {}", &job_witness.job_hash);
                             let serialized_job_witness = serde_json::to_string(&job_witness)?;
                             finished_job_topic_tx.send(serialized_job_witness.into()).await?;
                         },
-                        _ = cancellation_token.cancelled() => {
+                        _ = shutdown_signal() => {
                             break
                         }
                         else => break
@@ -113,12 +109,12 @@ impl Executor {
 
 impl Drop for Executor {
     fn drop(&mut self) {
-        self.cancellation_token.cancel();
-        block_on(async move {
-            if let Some(handle) = self.handle.take() {
+        let handle = self.handle.take();
+        tokio::spawn(async move {
+            if let Some(handle) = handle {
                 handle.await.unwrap().unwrap();
             }
-        })
+        });
     }
 }
 

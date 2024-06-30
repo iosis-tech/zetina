@@ -1,13 +1,12 @@
-use futures::executor::block_on;
 use libp2p::gossipsub::Event;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use tokio::{
     sync::{broadcast, mpsc},
     task::JoinHandle,
 };
-use tokio_util::sync::CancellationToken;
 use tracing::info;
 use zetina_common::{
+    graceful_shutdown::shutdown_signal,
     hash,
     job::Job,
     job_witness::JobWitness,
@@ -16,7 +15,6 @@ use zetina_common::{
 };
 
 pub struct Delegator {
-    cancellation_token: CancellationToken,
     handle: Option<JoinHandle<Result<(), DelegatorError>>>,
 }
 
@@ -25,10 +23,7 @@ impl Delegator {
         job_witness_tx: broadcast::Sender<JobWitness>,
         mut events_rx: mpsc::Receiver<Event>,
     ) -> Self {
-        let cancellation_token = CancellationToken::new();
-
         Self {
-            cancellation_token: cancellation_token.to_owned(),
             handle: Some(tokio::spawn(async move {
                 loop {
                     tokio::select! {
@@ -48,7 +43,7 @@ impl Delegator {
                                     // Received a finished-job message from the network
                                     if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::FinishedJob).into() {
                                         let job_witness: JobWitness = serde_json::from_slice(&message.data)?;
-                                        info!("Received finished job event: {}", hash!(&job_witness));
+                                        info!("Received finished job event: {}", &job_witness.job_hash);
                                         job_witness_tx.send(job_witness)?;
                                     }
                                 },
@@ -61,7 +56,7 @@ impl Delegator {
                                 _ => {}
                             }
                         },
-                        _ = cancellation_token.cancelled() => {
+                        _ = shutdown_signal() => {
                             break
                         }
                         else => break
@@ -75,12 +70,12 @@ impl Delegator {
 
 impl Drop for Delegator {
     fn drop(&mut self) {
-        self.cancellation_token.cancel();
-        block_on(async move {
-            if let Some(handle) = self.handle.take() {
+        let handle = self.handle.take();
+        tokio::spawn(async move {
+            if let Some(handle) = handle {
                 handle.await.unwrap().unwrap();
             }
-        })
+        });
     }
 }
 

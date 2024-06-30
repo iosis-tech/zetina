@@ -10,12 +10,9 @@ use starknet::signers::SigningKey;
 use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::pin::Pin;
-use tokio::{
-    select,
-    sync::{broadcast, mpsc},
-};
+use tokio::sync::{broadcast, mpsc};
 use tonic::{Request, Response, Status, Streaming};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use zetina_common::hash;
 use zetina_common::{
     job::{Job, JobData},
@@ -55,14 +52,19 @@ impl DelegatorService for DelegatorGRPCServer {
 
         let out_stream = stream! {
             loop {
-                select! {
-                    Ok(request) = in_stream.select_next_some() => {
-                        let job_data = JobData::new(0, request.cairo_pie);
-                        let job = Job::try_from_job_data(job_data, &signing_key);
-                        queue_set.insert(hash!(job));
-                        let serialized_job = serde_json::to_string(&job).unwrap();
-                        job_channel.send(serialized_job.into()).await.unwrap();
-                        info!("Sent a new job: {}", hash!(&job));
+                tokio::select! {
+                    Some(request) = in_stream.next() => {
+                        match request {
+                            Ok(r) => {
+                                let job_data = JobData::new(0, r.cairo_pie);
+                                let job = Job::try_from_job_data(job_data, &signing_key);
+                                queue_set.insert(hash!(job));
+                                let serialized_job = serde_json::to_string(&job).unwrap();
+                                job_channel.send(serialized_job.into()).await.unwrap();
+                                info!("Sent a new job: {}", hash!(&job));
+                            }
+                            Err(err) => error!("Error: {}",err)
+                        }
                     }
                     Ok(rx) = witness_channel.recv() => {
                         debug!("Received job witness: {}", &rx.job_hash);
@@ -72,6 +74,7 @@ impl DelegatorService for DelegatorGRPCServer {
                         }
                     }
                     else => {
+                        error!("Stream cancelled!");
                         yield Err(Status::cancelled(""))
                     }
                 }

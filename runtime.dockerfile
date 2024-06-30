@@ -76,3 +76,6 @@ RUN pip install -r requirements.txt && \
 
 # Copy the current directory content into the container
 COPY . .
+
+# Build
+RUN cargo build --release
