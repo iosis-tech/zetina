@@ -1,14 +1,14 @@
 pub mod executor;
 pub mod swarm;
-pub mod tonic;
 
-use ::tonic::transport::Server;
+use axum::Router;
 use executor::Executor;
 use libp2p::gossipsub::{self};
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
+use std::time::Duration;
 use swarm::SwarmRunner;
-use tokio::sync::mpsc;
-use tonic::{proto::executor_service_server::ExecutorServiceServer, ExecutorGRPCServer};
+use tokio::{net::TcpListener, sync::mpsc};
+use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
     graceful_shutdown::shutdown_signal,
@@ -69,16 +69,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Executor::new(swarm_events_rx, finished_job_topic_tx, picked_job_topic_tx, runner, prover);
 
-    let server = ExecutorGRPCServer::default();
+    // Create a `TcpListener` using tokio.
+    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter.set_serving::<ExecutorServiceServer<ExecutorGRPCServer>>().await;
-
-    Server::builder()
-        .add_service(health_service)
-        .add_service(ExecutorServiceServer::new(server))
-        .serve_with_shutdown("0.0.0.0:50052".parse().unwrap(), shutdown_signal())
-        .await?;
-
+    // Run the server with graceful shutdown
+    axum::serve(
+        listener,
+        Router::new().layer((
+            TraceLayer::new_for_http(),
+            // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
+            // requests don't hang forever.
+            TimeoutLayer::new(Duration::from_secs(10)),
+        )),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }

@@ -90,7 +90,7 @@ export default function Home() {
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop: ondrop })
-
+  
   return (
     <ThemeProvider theme={darkTheme}>
       <div className="h-screen flex flex-col background">

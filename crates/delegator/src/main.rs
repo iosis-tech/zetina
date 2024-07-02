@@ -1,14 +1,17 @@
 pub mod delegator;
 pub mod swarm;
-pub mod tonic;
 
-use ::tonic::transport::Server;
+use axum::Router;
 use delegator::Delegator;
 use libp2p::gossipsub;
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
+use std::time::Duration;
 use swarm::SwarmRunner;
-use tokio::sync::{broadcast, mpsc};
-use tonic::{proto::delegator_service_server::DelegatorServiceServer, DelegatorGRPCServer};
+use tokio::{
+    net::TcpListener,
+    sync::{broadcast, mpsc},
+};
+use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
     graceful_shutdown::shutdown_signal,
@@ -58,21 +61,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Delegator::new(job_picked_tx, job_witness_tx, swarm_events_rx);
 
-    let server = DelegatorGRPCServer::new(
-        node_account.get_signing_key().to_owned(),
-        new_job_topic_tx,
-        job_picked_rx,
-        job_witness_rx,
-    );
+    // Create a `TcpListener` using tokio.
+    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
 
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter.set_serving::<DelegatorServiceServer<DelegatorGRPCServer>>().await;
-
-    Server::builder()
-        .add_service(health_service)
-        .add_service(DelegatorServiceServer::new(server))
-        .serve_with_shutdown("0.0.0.0:50051".parse().unwrap(), shutdown_signal())
-        .await?;
-
+    // Run the server with graceful shutdown
+    axum::serve(
+        listener,
+        Router::new().layer((
+            TraceLayer::new_for_http(),
+            // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
+            // requests don't hang forever.
+            TimeoutLayer::new(Duration::from_secs(10)),
+        )),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }
