@@ -12,6 +12,7 @@ use tonic::{proto::delegator_service_server::DelegatorServiceServer, DelegatorGR
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
     graceful_shutdown::shutdown_signal,
+    job::Job,
     job_witness::JobWitness,
     network::Network,
     node_account::NodeAccount,
@@ -43,6 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let finished_job_topic = gossipsub_ident_topic(network, Topic::FinishedJob);
 
     let (swarm_events_tx, swarm_events_rx) = mpsc::channel::<gossipsub::Event>(100);
+    let (job_picked_tx, job_picked_rx) = broadcast::channel::<Job>(100);
     let (job_witness_tx, job_witness_rx) = broadcast::channel::<JobWitness>(100);
 
     let (new_job_topic_tx, new_job_topic_rx) = mpsc::channel::<Vec<u8>>(100);
@@ -54,11 +56,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         swarm_events_tx,
     )?;
 
-    Delegator::new(job_witness_tx, swarm_events_rx);
+    Delegator::new(job_picked_tx, job_witness_tx, swarm_events_rx);
 
     let server = DelegatorGRPCServer::new(
         node_account.get_signing_key().to_owned(),
         new_job_topic_tx,
+        job_picked_rx,
         job_witness_rx,
     );
 

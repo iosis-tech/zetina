@@ -3,11 +3,37 @@ syntax = "proto3";
 package delegator;
 
 service DelegatorService {
-  rpc Delegator(stream DelegateRequest) returns (stream DelegateResponse) {}
+  rpc Delegate(DelegateRequest) returns (DelegateResponse) {}
+  rpc Events(EventsRequest) returns (stream EventsResponse) {}
 }
 
-message DelegateRequest { bytes cairo_pie = 1; }
+message DelegateRequest {
+  bytes cairo_pie = 1;
+}
+
 message DelegateResponse {
-  bytes proof = 1;
   uint64 job_hash = 2;
+}
+
+message EventsRequest {
+  uint64 job_hash = 1;
+}
+
+message EventsResponse {
+  EventType event_type = 1;
+  oneof event {
+    Picked picked = 2;
+    Proven proven = 3;
+  }
+}
+
+enum EventType {
+  PICKED = 0;
+  PROVEN = 1;
+}
+
+message Picked {}
+
+message Proven {
+  bytes proof = 1;
 }

@@ -20,6 +20,7 @@ pub struct Delegator {
 
 impl Delegator {
     pub fn new(
+        job_picked_tx: broadcast::Sender<Job>,
         job_witness_tx: broadcast::Sender<JobWitness>,
         mut events_rx: mpsc::Receiver<Event>,
     ) -> Self {
@@ -39,6 +40,7 @@ impl Delegator {
                                     if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {
                                         let job: Job = serde_json::from_slice(&message.data)?;
                                         info!("Received picked job event: {}", hash!(&job));
+                                        job_picked_tx.send(job)?;
                                     }
                                     // Received a finished-job message from the network
                                     if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::FinishedJob).into() {
@@ -84,7 +86,10 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum DelegatorError {
     #[error("broadcast_send_error")]
-    BroadcastSendError(#[from] tokio::sync::broadcast::error::SendError<JobWitness>),
+    BroadcastJobSendError(#[from] tokio::sync::broadcast::error::SendError<Job>),
+
+    #[error("broadcast_send_error")]
+    BroadcastJobWitnessSendError(#[from] tokio::sync::broadcast::error::SendError<JobWitness>),
 
     #[error("io")]
     Io(#[from] std::io::Error),
