@@ -16,7 +16,11 @@ use tokio::{
     net::TcpListener,
     sync::{broadcast, mpsc},
 };
-use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    timeout::TimeoutLayer,
+    trace::TraceLayer,
+};
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
     graceful_shutdown::shutdown_signal,
@@ -80,6 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
                 // requests don't hang forever.
                 TimeoutLayer::new(Duration::from_secs(10)),
+                CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any),
             ))
             .with_state(ServerState {
                 signing_key: node_account.get_signing_key().to_owned(),

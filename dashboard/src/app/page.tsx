@@ -13,6 +13,7 @@ import StepConnector, {
   stepConnectorClasses,
 } from "@mui/material/StepConnector";
 import { DelegateRequest, DelegateResponse } from "./api";
+import { useState } from "react";
 
 const steps = [
   "Job propagated to network",
@@ -105,7 +106,7 @@ export default function Home() {
         });
 
         try {
-          const response = await fetch("127.0.0.1:3010/delegate", {
+          const response = await fetch("http://localhost:3010/delegate", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -121,14 +122,18 @@ export default function Home() {
             await response.json(),
           );
           console.log("Job hash:", data.job_hash);
+          setIsProcessing(data.job_hash)
         } catch (error) {
           console.error("Failed to upload file:", error);
+          setIsProcessing(null)
         }
       }
     };
 
     reader.readAsArrayBuffer(file);
   };
+
+  const [isProcessing, setIsProcessing] = useState<number | null>(null);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: ondrop,
@@ -147,13 +152,16 @@ export default function Home() {
               {...getRootProps()}
             >
               <input className="w-full" {...getInputProps()} />
-              {isDragActive ? (
+              {isProcessing != null ? (
+                <p className="text-center">Processing job hash: {isProcessing}</p>
+              ) : isDragActive ? (
                 <p className="text-center">Drop the Trace here ...</p>
               ) : (
                 <p className="text-center">
                   Drag Trace here, or click to select files
                 </p>
-              )}
+              )
+              }
             </div>
             <LinearProgress sx={{ backgroundColor: "transparent" }} />
             <Stepper
