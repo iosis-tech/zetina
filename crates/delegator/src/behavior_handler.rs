@@ -14,11 +14,13 @@ use zetina_common::{
     topic::{gossipsub_ident_topic, Topic},
 };
 
-pub struct Delegator {
+use crate::DelegatorError;
+
+pub struct BehaviourHandler {
     handle: Option<JoinHandle<Result<(), DelegatorError>>>,
 }
 
-impl Delegator {
+impl BehaviourHandler {
     pub fn new(
         job_witness_tx: broadcast::Sender<JobWitness>,
         mut events_rx: mpsc::Receiver<Event>,
@@ -68,7 +70,7 @@ impl Delegator {
     }
 }
 
-impl Drop for Delegator {
+impl Drop for BehaviourHandler {
     fn drop(&mut self) {
         let handle = self.handle.take();
         tokio::spawn(async move {
@@ -77,18 +79,4 @@ impl Drop for Delegator {
             }
         });
     }
-}
-
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum DelegatorError {
-    #[error("broadcast_send_error")]
-    BroadcastSendError(#[from] tokio::sync::broadcast::error::SendError<JobWitness>),
-
-    #[error("io")]
-    Io(#[from] std::io::Error),
-
-    #[error("serde")]
-    Serde(#[from] serde_json::Error),
 }

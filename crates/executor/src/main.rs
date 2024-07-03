@@ -1,12 +1,13 @@
-pub mod executor;
+pub mod behavior_handler;
 pub mod swarm;
 pub mod tonic;
 
 use ::tonic::transport::Server;
-use executor::Executor;
+use behavior_handler::BehaviourHandler;
 use libp2p::gossipsub::{self};
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use swarm::SwarmRunner;
+use thiserror::Error;
 use tokio::sync::mpsc;
 use tonic::{proto::executor_service_server::ExecutorServiceServer, ExecutorGRPCServer};
 use tracing_subscriber::EnvFilter;
@@ -16,8 +17,26 @@ use zetina_common::{
     node_account::NodeAccount,
     topic::{gossipsub_ident_topic, Topic},
 };
-use zetina_prover::stone_prover::StoneProver;
-use zetina_runner::cairo_runner::CairoRunner;
+use zetina_prover::{errors::ProverControllerError, stone_prover::StoneProver};
+use zetina_runner::{cairo_runner::CairoRunner, errors::RunnerControllerError};
+
+#[derive(Error, Debug)]
+pub enum ExecutorError {
+    #[error("prover_controller_error")]
+    ProverControllerError(#[from] ProverControllerError),
+
+    #[error("runner_controller_error")]
+    RunnerControllerError(#[from] RunnerControllerError),
+
+    #[error("mpsc_send_error")]
+    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<Vec<u8>>),
+
+    #[error("io")]
+    Io(#[from] std::io::Error),
+
+    #[error("serde")]
+    Serde(#[from] serde_json::Error),
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -67,7 +86,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let runner = CairoRunner::new(bootloader_program_path, verifying_key);
     let prover = StoneProver::new();
 
-    Executor::new(swarm_events_rx, finished_job_topic_tx, picked_job_topic_tx, runner, prover);
+    BehaviourHandler::new(
+        swarm_events_rx,
+        finished_job_topic_tx,
+        picked_job_topic_tx,
+        runner,
+        prover,
+    );
 
     let server = ExecutorGRPCServer::default();
 
@@ -77,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Server::builder()
         .add_service(health_service)
         .add_service(ExecutorServiceServer::new(server))
-        .serve_with_shutdown("0.0.0.0:50052".parse().unwrap(), shutdown_signal())
+        .serve_with_shutdown("[::]:50052".parse().unwrap(), shutdown_signal())
         .await?;
 
     Ok(())

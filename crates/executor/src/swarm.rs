@@ -50,8 +50,13 @@ impl SwarmRunner {
             swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
         }
 
+        // Listen on both IPv4 and IPv6 for UDP/QUIC
         swarm.listen_on("/ip4/0.0.0.0/udp/5680/quic-v1".parse()?)?;
+        swarm.listen_on("/ip6/::/udp/5680/quic-v1".parse()?)?;
+
+        // Listen on both IPv4 and IPv6 for TCP
         swarm.listen_on("/ip4/0.0.0.0/tcp/5681".parse()?)?;
+        swarm.listen_on("/ip6/::/tcp/5681".parse()?)?;
 
         Ok(SwarmRunner {
             handle: Some(tokio::spawn(async move {

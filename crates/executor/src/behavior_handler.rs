@@ -22,13 +22,15 @@ use zetina_runner::cairo_runner::CairoRunner;
 use zetina_runner::errors::RunnerControllerError;
 use zetina_runner::traits::RunnerController;
 
+use crate::ExecutorError;
+
 const MAX_PARALLEL_JOBS: usize = 1;
 
-pub struct Executor {
+pub struct BehaviourHandler {
     handle: Option<JoinHandle<Result<(), ExecutorError>>>,
 }
 
-impl Executor {
+impl BehaviourHandler {
     pub fn new(
         mut events_rx: mpsc::Receiver<Event>,
         finished_job_topic_tx: mpsc::Sender<Vec<u8>>,
@@ -107,7 +109,7 @@ impl Executor {
     }
 }
 
-impl Drop for Executor {
+impl Drop for BehaviourHandler {
     fn drop(&mut self) {
         let handle = self.handle.take();
         tokio::spawn(async move {
@@ -116,24 +118,4 @@ impl Drop for Executor {
             }
         });
     }
-}
-
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum ExecutorError {
-    #[error("prover_controller_error")]
-    ProverControllerError(#[from] ProverControllerError),
-
-    #[error("runner_controller_error")]
-    RunnerControllerError(#[from] RunnerControllerError),
-
-    #[error("mpsc_send_error")]
-    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<Vec<u8>>),
-
-    #[error("io")]
-    Io(#[from] std::io::Error),
-
-    #[error("serde")]
-    Serde(#[from] serde_json::Error),
 }

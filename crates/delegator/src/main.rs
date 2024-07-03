@@ -1,12 +1,13 @@
-pub mod delegator;
+pub mod behavior_handler;
 pub mod swarm;
 pub mod tonic;
 
 use ::tonic::transport::Server;
-use delegator::Delegator;
+use behavior_handler::BehaviourHandler;
 use libp2p::gossipsub;
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use swarm::SwarmRunner;
+use thiserror::Error;
 use tokio::sync::{broadcast, mpsc};
 use tonic::{proto::delegator_service_server::DelegatorServiceServer, DelegatorGRPCServer};
 use tracing_subscriber::EnvFilter;
@@ -17,6 +18,18 @@ use zetina_common::{
     node_account::NodeAccount,
     topic::{gossipsub_ident_topic, Topic},
 };
+
+#[derive(Error, Debug)]
+pub enum DelegatorError {
+    #[error("broadcast_send_error")]
+    BroadcastSendError(#[from] tokio::sync::broadcast::error::SendError<JobWitness>),
+
+    #[error("io")]
+    Io(#[from] std::io::Error),
+
+    #[error("serde")]
+    Serde(#[from] serde_json::Error),
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -54,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         swarm_events_tx,
     )?;
 
-    Delegator::new(job_witness_tx, swarm_events_rx);
+    BehaviourHandler::new(job_witness_tx, swarm_events_rx);
 
     let server = DelegatorGRPCServer::new(
         node_account.get_signing_key().to_owned(),
@@ -68,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Server::builder()
         .add_service(health_service)
         .add_service(DelegatorServiceServer::new(server))
-        .serve_with_shutdown("0.0.0.0:50051".parse().unwrap(), shutdown_signal())
+        .serve_with_shutdown("[::]:50051".parse().unwrap(), shutdown_signal())
         .await?;
 
     Ok(())
