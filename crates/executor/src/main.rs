@@ -3,7 +3,7 @@ pub mod swarm;
 
 use axum::Router;
 use executor::Executor;
-use libp2p::gossipsub::{self};
+use libp2p::gossipsub;
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use std::time::Duration;
 use swarm::SwarmRunner;

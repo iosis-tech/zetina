@@ -1,7 +1,12 @@
+pub mod api;
 pub mod delegator;
 pub mod swarm;
 
-use axum::Router;
+use api::ServerState;
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use delegator::Delegator;
 use libp2p::gossipsub;
 use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
@@ -42,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Generate topic
-    let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
+    let job_topic = gossipsub_ident_topic(network, Topic::NewJob);
     let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
     let finished_job_topic = gossipsub_ident_topic(network, Topic::FinishedJob);
 
@@ -50,12 +55,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (job_picked_tx, job_picked_rx) = broadcast::channel::<Job>(100);
     let (job_witness_tx, job_witness_rx) = broadcast::channel::<JobWitness>(100);
 
-    let (new_job_topic_tx, new_job_topic_rx) = mpsc::channel::<Vec<u8>>(100);
+    let (job_topic_tx, job_topic_rx) = mpsc::channel::<Vec<u8>>(100);
 
     SwarmRunner::new(
         node_account.get_keypair(),
-        vec![new_job_topic.to_owned(), picked_job_topic, finished_job_topic],
-        vec![(new_job_topic.to_owned(), new_job_topic_rx)],
+        vec![job_topic.to_owned(), picked_job_topic, finished_job_topic],
+        vec![(job_topic, job_topic_rx)],
         swarm_events_tx,
     )?;
 
@@ -67,12 +72,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run the server with graceful shutdown
     axum::serve(
         listener,
-        Router::new().layer((
-            TraceLayer::new_for_http(),
-            // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
-            // requests don't hang forever.
-            TimeoutLayer::new(Duration::from_secs(10)),
-        )),
+        Router::new()
+            .route("/delegate", post(api::deletage_handler))
+            .route("/job_events", get(api::job_events_handler))
+            .layer((
+                TraceLayer::new_for_http(),
+                // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
+                // requests don't hang forever.
+                TimeoutLayer::new(Duration::from_secs(10)),
+            ))
+            .with_state(ServerState {
+                signing_key: node_account.get_signing_key().to_owned(),
+                job_topic_tx,
+                job_picked_rx,
+                job_witness_rx,
+            }),
     )
     .with_graceful_shutdown(shutdown_signal())
     .await?;
