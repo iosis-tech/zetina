@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Delegator::new(job_picked_tx, job_witness_tx, swarm_events_rx);
 
     // Create a `TcpListener` using tokio.
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();
 
     // Run the server with graceful shutdown
     axum::serve(

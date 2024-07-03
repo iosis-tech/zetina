@@ -62,13 +62,19 @@ pub async fn deletage_handler(
 }
 
 #[derive(Debug, Deserialize)]
-pub struct JobEventsInput {
+pub struct JobEventsRequest {
     job_hash: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub enum JobEventsResponse {
+    Picked(u64),
+    Witness(Vec<u8>),
 }
 
 pub async fn job_events_handler(
     State(mut state): State<ServerState>,
-    Json(input): Json<JobEventsInput>,
+    Json(input): Json<JobEventsRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, io::Error>>> {
     let job_hash = input.job_hash;
 
@@ -78,13 +84,13 @@ pub async fn job_events_handler(
                 Ok(job) = state.job_picked_rx.recv() => {
                     debug!("Received job picked: {}", hash!(job));
                     if hash!(job) == job_hash {
-                        yield Event::default().json_data(job).map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e.to_string()));
+                        yield Event::default().json_data(JobEventsResponse::Picked(hash!(job))).map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e.to_string()));
                     }
                 },
                 Ok(job_witness) = state.job_witness_rx.recv() => {
                     debug!("Received job witness: {}", &job_witness.job_hash);
                     if hash!(job_witness.job_hash) == job_hash {
-                        yield Event::default().json_data(job_witness).map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e.to_string()));
+                        yield Event::default().json_data(JobEventsResponse::Witness(job_witness.proof)).map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e.to_string()));
                     }
                 }
                 else => break

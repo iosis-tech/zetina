@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Executor::new(swarm_events_rx, finished_job_topic_tx, picked_job_topic_tx, runner, prover);
 
     // Create a `TcpListener` using tokio.
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3020").await.unwrap();
 
     // Run the server with graceful shutdown
     axum::serve(
