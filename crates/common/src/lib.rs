@@ -10,5 +10,6 @@ pub mod network;
 pub mod node_account;
 pub mod process;
 pub mod topic;
+pub mod value_parser;
 
 // mod fuzzing;
