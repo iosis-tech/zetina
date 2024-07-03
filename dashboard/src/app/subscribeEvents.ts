@@ -1,11 +1,10 @@
-export default async function subscribeEvents(
+export default function subscribeEvents(
   url: string,
-  fetchparams: string,
-  sseparams: string,
+  params: string,
   callback: (data: any) => void,
 ) {
-  const events = new EventSource(`${url}?${sseparams}`, {
-    withCredentials: true,
+  const events = new EventSource(`${url}?${params}`, {
+    withCredentials: false,
   });
 
   const eventSource = new ReadableStream({
@@ -28,13 +27,6 @@ export default async function subscribeEvents(
       callback(data);
     },
   });
-
-  const response = await fetch(`${url}?${fetchparams}`, {
-    method: "GET",
-    credentials: "same-origin",
-  }).then((r) => r.json());
-
-  callback(response);
 
   eventSource.pipeTo(eventSink);
 

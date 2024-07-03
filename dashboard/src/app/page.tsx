@@ -12,8 +12,10 @@ import Check from "@mui/icons-material/Check";
 import StepConnector, {
   stepConnectorClasses,
 } from "@mui/material/StepConnector";
-import { DelegateRequest, DelegateResponse } from "./api";
+import { DelegateRequest, DelegateResponse, JobEventsResponse, JobHash, Proof } from "./api";
 import { useState } from "react";
+import subscribeEvents from "./subscribeEvents";
+import assert from "assert";
 
 const steps = [
   "Job propagated to network",
@@ -26,11 +28,6 @@ const QontoConnector = styled(StepConnector)(({ theme }) => ({
     top: 10,
     left: "calc(-50% + 16px)",
     right: "calc(50% + 16px)",
-  },
-  [`&.${stepConnectorClasses.active}`]: {
-    [`& .${stepConnectorClasses.line}`]: {
-      borderColor: "#784af4",
-    },
   },
   [`&.${stepConnectorClasses.completed}`]: {
     [`& .${stepConnectorClasses.line}`]: {
@@ -51,9 +48,6 @@ const QontoStepIconRoot = styled("div")<{ ownerState: { active?: boolean } }>(
     display: "flex",
     height: 22,
     alignItems: "center",
-    ...(ownerState.active && {
-      color: "#784af4",
-    }),
     "& .QontoStepIcon-completedIcon": {
       color: "#784af4",
       zIndex: 1,
@@ -86,6 +80,7 @@ export default function Home() {
   const darkTheme = createTheme({
     palette: {
       mode: "dark",
+      primary: { main: "#784af4", dark: "#784af4" }
     },
   });
 
@@ -100,10 +95,14 @@ export default function Home() {
     reader.onload = async (e) => {
       if (e.target && e.target.result) {
         const fileBytes = new Uint8Array(e.target.result as ArrayBuffer);
-
+        console.log(Array.from(fileBytes));
         const requestBody: DelegateRequest = DelegateRequest.parse({
-          cairo_pie: fileBytes,
+          trace: Array.from(fileBytes),
         });
+
+        console.log(requestBody);
+
+        let subscriber: EventSource | null = null
 
         try {
           const response = await fetch("http://localhost:3010/delegate", {
@@ -122,10 +121,33 @@ export default function Home() {
             await response.json(),
           );
           console.log("Job hash:", data.job_hash);
-          setIsProcessing(data.job_hash)
+
+          setActiveStep(1)
+          setIsProcessing(data.job_hash);
+
+          subscriber = subscribeEvents(
+            "http://localhost:3010/job_events",
+            `job_hash=${data.job_hash.toString()}`,
+            (event) => {
+              let job_event = JobEventsResponse.parse(event);
+              if (job_event.type == "Picked") {
+                let job_hash = JobHash.parse(job_event.data);
+                assert(job_hash == data.job_hash)
+                setActiveStep(2)
+              }
+              if (job_event.type == "Witness") {
+                let proof = Proof.parse(job_event.data);
+                setActiveStep(3)
+                setDownloadBlob([new Blob([new Uint8Array(proof)]), `${data.job_hash}_proof.json`])
+                setIsProcessing(null)
+                subscriber?.close()
+              }
+            },
+          );
         } catch (error) {
           console.error("Failed to upload file:", error);
-          setIsProcessing(null)
+          setIsProcessing(null);
+          subscriber?.close()
         }
       }
     };
@@ -133,7 +155,9 @@ export default function Home() {
     reader.readAsArrayBuffer(file);
   };
 
-  const [isProcessing, setIsProcessing] = useState<number | null>(null);
+  const [isProcessing, setIsProcessing] = useState<bigint | null>(null);
+  const [activeStep, setActiveStep] = useState<number>(0);
+  const [downloadBlob, setDownloadBlob] = useState<[Blob, string] | null>(null);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: ondrop,
@@ -144,8 +168,9 @@ export default function Home() {
       <div className="h-screen flex flex-col background">
         <main className="flex-1 grid justify-center items-center">
           <div className="p-10 border-2 border-gray-800 rounded-2xl backdrop-blur-md grid grid-flow-row gap-8 w-[800px]">
-            <div className="text-center font-medium text-xl">
-              Supply program Trace
+            <div className="text-center font-medium grid grid-flow-row gap-1">
+              <div className="text-xl font-bold">ZK prover network</div>
+              <div className="text-md">Prove program Trace</div>
             </div>
             <div
               className="cursor-pointer p-10 border-2 rounded-2xl border-dashed border-gray-800 hover:bg"
@@ -153,19 +178,22 @@ export default function Home() {
             >
               <input className="w-full" {...getInputProps()} />
               {isProcessing != null ? (
-                <p className="text-center">Processing job hash: {isProcessing}</p>
+                <p className="text-center">
+                  Processing job: {isProcessing.toString()}
+                </p>
               ) : isDragActive ? (
                 <p className="text-center">Drop the Trace here ...</p>
               ) : (
                 <p className="text-center">
                   Drag Trace here, or click to select files
                 </p>
-              )
-              }
+              )}
             </div>
-            <LinearProgress sx={{ backgroundColor: "transparent" }} />
+            <LinearProgress
+              sx={{ backgroundColor: 'transparent', display: isProcessing != null ? 'block' : 'none' }}
+            />
             <Stepper
-              activeStep={4}
+              activeStep={activeStep}
               alternativeLabel
               connector={<QontoConnector />}
             >
@@ -178,7 +206,18 @@ export default function Home() {
               ))}
             </Stepper>
             <div className="grid justify-center items-center">
-              <Button variant="outlined" size="large" disabled>
+              <Button variant="outlined" size="large" disabled={downloadBlob == null} onClick={() => {
+                if (downloadBlob != null) {
+                  const download_url = window.URL.createObjectURL(downloadBlob[0]);
+                  const a = document.createElement('a');
+                  a.href = download_url;
+                  a.download = downloadBlob[1];
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  window.URL.revokeObjectURL(download_url);
+                }
+              }}>
                 Download Proof
               </Button>
             </div>

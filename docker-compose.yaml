@@ -23,7 +23,7 @@ services:
           cpus: '8'
           memory: '10G'
     ports:
-      - "50051:50051/tcp"
+      - "3010:3010/tcp"
     environment:
       - RUST_LOG=info
     networks:
@@ -40,7 +40,7 @@ services:
           cpus: '8'
           memory: '10G'
     ports:
-      - "50052:50052/tcp"
+      - "3020:3020/tcp"
     environment:
       - RUST_LOG=info
     networks:
