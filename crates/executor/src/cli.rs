@@ -1,18 +1,17 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use libp2p::gossipsub;
-use starknet::{
-    core::types::FieldElement,
-    providers::{jsonrpc::HttpTransport, JsonRpcClient, Url},
-};
+use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use tokio::sync::mpsc;
 use tonic::transport::Server;
-use tracing_subscriber::EnvFilter;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 use zetina_common::{
     graceful_shutdown::shutdown_signal,
     network::Network,
     node_account::NodeAccount,
     topic::{gossipsub_ident_topic, Topic},
-    value_parser::{parse_bytes, parse_field_element},
 };
 use zetina_prover::stone_prover::StoneProver;
 use zetina_runner::cairo_runner::CairoRunner;
@@ -28,34 +27,22 @@ use crate::{
 #[command(version, about, long_about = None)]
 pub struct ExecutorCommand {
     pub network: Network,
-    #[arg(value_parser = parse_bytes)]
-    pub private_key: Vec<u8>,
-    #[arg(value_parser = parse_field_element)]
-    pub account_address: FieldElement,
+    pub private_key: String,
+    pub account_address: String,
     pub rpc_url: Url,
+    pub bootloader_program_path: PathBuf,
 }
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
+    let subscriber = FmtSubscriber::builder().with_max_level(Level::INFO).finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     let executor_command = ExecutorCommand::parse();
-    let ExecutorCommand { network, private_key, account_address, rpc_url } = executor_command;
-    let ws_root = std::path::PathBuf::from(
-        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"),
-    )
-    .join("../../");
-    let bootloader_program_path = ws_root.join("target/bootloader.json");
-
-    // // TODO: common setup in node initiate binary
-    // let network = Network::Sepolia;
-    // let private_key =
-    //     hex::decode("07c7a41c77c7a3b19e7c77485854fc88b09ed7041361595920009f81236d55d2")?;
-    // let account_address =
-    //     hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
-    // let url = "https://starknet-sepolia.public.blastapi.io";
+    let ExecutorCommand { network, private_key, account_address, rpc_url, bootloader_program_path } =
+        executor_command;
 
     let node_account = NodeAccount::new(
-        private_key,
-        account_address,
+        hex::decode(private_key)?,
+        hex::decode(account_address)?,
         network,
         JsonRpcClient::new(HttpTransport::new(rpc_url)),
     );

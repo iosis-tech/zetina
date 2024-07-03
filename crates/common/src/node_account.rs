@@ -24,7 +24,7 @@ impl<P> NodeAccount<P>
 where
     P: Provider + Sync + Send + 'static,
 {
-    pub fn new(private_key: Vec<u8>, address: FieldElement, network: Network, provider: P) -> Self {
+    pub fn new(private_key: Vec<u8>, address: Vec<u8>, network: Network, provider: P) -> Self {
         let secret_key = libp2p::identity::ecdsa::SecretKey::try_from_bytes(private_key.as_slice())
             .expect("Failed to create secret key from private key.");
         let p2p_keypair =
@@ -32,6 +32,7 @@ where
         let signing_key = SigningKey::from_secret_scalar(
             FieldElement::from_byte_slice_be(private_key.as_slice()).unwrap(),
         );
+        let address = FieldElement::from_byte_slice_be(address.as_slice()).unwrap();
         let signer = LocalWallet::from(signing_key.clone());
         let network = network.to_field_element();
         let account =

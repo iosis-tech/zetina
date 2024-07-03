@@ -1,19 +1,16 @@
 use clap::{command, Parser};
 use libp2p::gossipsub;
-use starknet::{
-    core::types::FieldElement,
-    providers::{jsonrpc::HttpTransport, JsonRpcClient, Url},
-};
+use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use tokio::sync::{broadcast, mpsc};
 use tonic::transport::Server;
-use tracing_subscriber::EnvFilter;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 use zetina_common::{
     graceful_shutdown::shutdown_signal,
     job_witness::JobWitness,
     network::Network,
     node_account::NodeAccount,
     topic::{gossipsub_ident_topic, Topic},
-    value_parser::{parse_bytes, parse_field_element},
 };
 
 use crate::{
@@ -27,29 +24,19 @@ use crate::{
 #[command(version, about, long_about = None)]
 pub struct DelegatorCommand {
     pub network: Network,
-    #[arg(value_parser = parse_bytes)]
-    pub private_key: Vec<u8>,
-    #[arg(value_parser = parse_field_element)]
-    pub account_address: FieldElement,
+    pub private_key: String,
+    pub account_address: String,
     pub rpc_url: Url,
 }
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
+    let subscriber = FmtSubscriber::builder().with_max_level(Level::INFO).finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     let delegator_command = DelegatorCommand::parse();
     let DelegatorCommand { network, private_key, account_address, rpc_url } = delegator_command;
-
-    // // TODO: common setup in node initiate binary
-    // let network = Network::Sepolia;
-    // let private_key =
-    //     hex::decode("018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f32")?;
-    // let account_address =
-    //     hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
-    // let url = "https://starknet-sepolia.public.blastapi.io";
-
     let node_account = NodeAccount::new(
-        private_key,
-        account_address,
+        hex::decode(private_key)?,
+        hex::decode(account_address)?,
         network,
         JsonRpcClient::new(HttpTransport::new(rpc_url)),
     );
