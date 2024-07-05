@@ -17,13 +17,6 @@ Dockerfile
 .next
 out
 
-# Ignore environment variables
-.env
-.env.local
-.env.development
-.env.production
-.env.test
-
 # Ignore miscellaneous files
 *.swp
 *.swo

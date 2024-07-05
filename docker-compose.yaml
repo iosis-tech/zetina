@@ -42,8 +42,6 @@ services:
           memory: '1G'
     ports:
       - "3000:3000/tcp"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://zetina-delegator:3010
     networks:
       - zetina-network
 
