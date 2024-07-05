@@ -13,6 +13,8 @@ Scarb.lock
 .snfoundry_cache/
 stone-prover
 bootloader*.json
+*.dockerfile
+*docker-compose*.yaml
 
 # Ignore Python-specific files
 *.pyc
@@ -30,3 +32,4 @@ build/
 .dockerignore.generated
 .dockerignore.custom
 .dockerignore.local
+

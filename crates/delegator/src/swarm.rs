@@ -79,6 +79,14 @@ impl SwarmRunner {
                             },
                             SwarmEvent::NewListenAddr { address, .. } => {
                                 debug!("Local node is listening on {address}");
+                            },
+                            SwarmEvent::ConnectionEstablished { peer_id, connection_id, num_established, .. } => {
+                                info!{"ConnectionEstablished: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
+                                swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                            }
+                            SwarmEvent::ConnectionClosed { peer_id, connection_id, num_established, .. } => {
+                                info!{"ConnectionClosed: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
+                                swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                             }
                             _ => {}
                         },

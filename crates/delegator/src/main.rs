@@ -54,8 +54,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let node_account = NodeAccount::new(private_key);
 
-    let p2p_keypair = libp2p::identity::Keypair::from(libp2p::identity::ecdsa::Keypair::generate());
-
     // Generate topic
     let job_topic = gossipsub_ident_topic(network, Topic::NewJob);
     let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
@@ -69,7 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     SwarmRunner::new(
         cli.dial_addresses,
-        &p2p_keypair,
+        node_account.get_keypair(),
         vec![job_topic.to_owned(), picked_job_topic, finished_job_topic],
         vec![(job_topic, job_topic_rx)],
         swarm_events_tx,
