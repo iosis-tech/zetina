@@ -12,7 +12,13 @@ import Check from "@mui/icons-material/Check";
 import StepConnector, {
   stepConnectorClasses,
 } from "@mui/material/StepConnector";
-import { DelegateRequest, DelegateResponse, JobEventsResponse, JobHash, Proof } from "./api";
+import {
+  DelegateRequest,
+  DelegateResponse,
+  JobEventsResponse,
+  JobHash,
+  Proof,
+} from "./api";
 import { useState } from "react";
 import subscribeEvents from "./subscribeEvents";
 import assert from "assert";
@@ -80,7 +86,7 @@ export default function Home() {
   const darkTheme = createTheme({
     palette: {
       mode: "dark",
-      primary: { main: "#784af4", dark: "#784af4" }
+      primary: { main: "#784af4", dark: "#784af4" },
     },
   });
 
@@ -102,16 +108,19 @@ export default function Home() {
 
         console.log(requestBody);
 
-        let subscriber: EventSource | null = null
+        let subscriber: EventSource | null = null;
 
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/delegate`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/delegate`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(requestBody),
             },
-            body: JSON.stringify(requestBody),
-          });
+          );
 
           if (!response.ok) {
             throw new Error(`Error: ${response.statusText}`);
@@ -122,7 +131,7 @@ export default function Home() {
           );
           console.log("Job hash:", data.job_hash);
 
-          setActiveStep(1)
+          setActiveStep(1);
           setIsProcessing(data.job_hash);
 
           subscriber = subscribeEvents(
@@ -132,22 +141,25 @@ export default function Home() {
               let job_event = JobEventsResponse.parse(event);
               if (job_event.type == "Picked") {
                 let job_hash = JobHash.parse(job_event.data);
-                assert(job_hash == data.job_hash)
-                setActiveStep(2)
+                assert(job_hash == data.job_hash);
+                setActiveStep(2);
               }
               if (job_event.type == "Witness") {
                 let proof = Proof.parse(job_event.data);
-                setActiveStep(3)
-                setDownloadBlob([new Blob([new Uint8Array(proof)]), `${data.job_hash}_proof.json`])
-                setIsProcessing(null)
-                subscriber?.close()
+                setActiveStep(3);
+                setDownloadBlob([
+                  new Blob([new Uint8Array(proof)]),
+                  `${data.job_hash}_proof.json`,
+                ]);
+                setIsProcessing(null);
+                subscriber?.close();
               }
             },
           );
         } catch (error) {
           console.error("Failed to upload file:", error);
           setIsProcessing(null);
-          subscriber?.close()
+          subscriber?.close();
         }
       }
     };
@@ -190,7 +202,10 @@ export default function Home() {
               )}
             </div>
             <LinearProgress
-              sx={{ backgroundColor: 'transparent', display: isProcessing != null ? 'block' : 'none' }}
+              sx={{
+                backgroundColor: "transparent",
+                display: isProcessing != null ? "block" : "none",
+              }}
             />
             <Stepper
               activeStep={activeStep}
@@ -206,18 +221,25 @@ export default function Home() {
               ))}
             </Stepper>
             <div className="grid justify-center items-center">
-              <Button variant="outlined" size="large" disabled={downloadBlob == null} onClick={() => {
-                if (downloadBlob != null) {
-                  const download_url = window.URL.createObjectURL(downloadBlob[0]);
-                  const a = document.createElement('a');
-                  a.href = download_url;
-                  a.download = downloadBlob[1];
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  window.URL.revokeObjectURL(download_url);
-                }
-              }}>
+              <Button
+                variant="outlined"
+                size="large"
+                disabled={downloadBlob == null}
+                onClick={() => {
+                  if (downloadBlob != null) {
+                    const download_url = window.URL.createObjectURL(
+                      downloadBlob[0],
+                    );
+                    const a = document.createElement("a");
+                    a.href = download_url;
+                    a.download = downloadBlob[1];
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(download_url);
+                  }
+                }}
+              >
                 Download Proof
               </Button>
             </div>

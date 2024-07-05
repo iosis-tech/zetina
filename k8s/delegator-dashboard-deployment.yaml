@@ -54,10 +54,10 @@ spec:
   ingressClassName: nginx-ingress-prod
   tls:
   - hosts:
-    - delegator-dashboard.zetina.iosis.tech
+    - dashboard.delegator.zetina.iosis.tech
     secretName: zetina-delegator-dashboard-tls
   rules:
-  - host: delegator-dashboard.zetina.iosis.tech
+  - host: dashboard.delegator.zetina.iosis.tech
     http:
       paths:
       - path: /
