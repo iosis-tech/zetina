@@ -2,12 +2,13 @@ use futures::StreamExt;
 use libp2p::gossipsub::{self, IdentTopic};
 use libp2p::identity::Keypair;
 use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
-use libp2p::{noise, tcp, yamux, SwarmBuilder};
+use libp2p::{noise, tcp, yamux, Multiaddr, SwarmBuilder};
 use std::error::Error;
+use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
 
 #[derive(NetworkBehaviour)]
@@ -21,6 +22,7 @@ pub struct SwarmRunner {
 
 impl SwarmRunner {
     pub fn new(
+        dial_addresses: Vec<String>,
         p2p_local_keypair: &Keypair,
         subscribe_topics: Vec<IdentTopic>,
         mut transmit_topics: Vec<(IdentTopic, mpsc::Receiver<Vec<u8>>)>,
@@ -43,6 +45,13 @@ impl SwarmRunner {
 
         for topic in subscribe_topics {
             swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
+        }
+
+        // Reach out to other nodes if specified
+        for to_dial in dial_addresses {
+            let addr: Multiaddr = Multiaddr::from_str(&to_dial)?;
+            swarm.dial(addr)?;
+            info!("Dialed {to_dial:?}")
         }
 
         swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
