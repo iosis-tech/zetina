@@ -2,6 +2,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: zetina-delegator-cert
+  namespace: zetina
 spec:
   secretName: zetina-delegator-tls
 
