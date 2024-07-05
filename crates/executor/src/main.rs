@@ -33,15 +33,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let network = Network::Sepolia;
     let private_key =
         hex::decode("07c7a41c77c7a3b19e7c77485854fc88b09ed7041361595920009f81236d55d2")?;
-    let account_address =
-        hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
-    let url = "https://starknet-sepolia.public.blastapi.io";
 
     let node_account = NodeAccount::new(
         private_key,
-        account_address,
-        network,
-        JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)),
     );
 
     // Generate topic
