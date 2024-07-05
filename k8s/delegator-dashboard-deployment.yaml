@@ -18,12 +18,9 @@ spec:
       - name: delegator-dashboard
         image: registry.internal.iosis.tech/zetina-delegator-dashboard
         resources:
-          requests:
-            cpu: "1"
-            memory: "1Gi"
           limits:
-            cpu: "10"
-            memory: "10Gi"
+            cpu: "1000m"
+            memory: "1Gi"
         env:
         - name: NEXT_PUBLIC_API_URL
           value: "http://delegator-service.zetina.svc.cluster.local:3010"
@@ -49,7 +46,7 @@ metadata:
   name: delegator-dashboard-ingress
   namespace: zetina
   annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: 0
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
 spec:
   ingressClassName: nginx-ingress-prod
   tls:

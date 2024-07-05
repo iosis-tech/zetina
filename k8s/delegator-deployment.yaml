@@ -18,12 +18,9 @@ spec:
       - name: delegator
         image: registry.internal.iosis.tech/zetina-delegator
         resources:
-          requests:
-            cpu: "1"
-            memory: "1Gi"
           limits:
-            cpu: "10"
-            memory: "10Gi"
+            cpu: "1000m"
+            memory: "1Gi"
         env:
         - name: RUST_LOG
           value: "info"
@@ -40,5 +37,30 @@ spec:
     app: delegator
   ports:
   - protocol: TCP
-    port: 3010
+    port: 80
     targetPort: 3010
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: delegator-dashboard-ingress
+  namespace: zetina
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  ingressClassName: nginx-ingress-prod
+  tls:
+  - hosts:
+    - delegator.zetina.iosis.tech
+    secretName: zetina-delegator-dashboard-tls
+  rules:
+  - host: delegator.zetina.iosis.tech
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: delegator-dashboard-service
+            port:
+              number: 80
