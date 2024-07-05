@@ -16,6 +16,7 @@ services:
     build:
       dockerfile: delegator.dockerfile
     image: zetina-delegator
+    hostname: zetina-delegator
     depends_on:
       - zetina-runtime
     deploy:
@@ -29,6 +30,7 @@ services:
       - zetina-network
     ports:
       - "3010:3010"
+    command: "bash -c cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f31"
 
   zetina-delegator-dashboard:
     build:
@@ -62,6 +64,7 @@ services:
       - RUST_LOG=info
     networks:
       - zetina-network
+    command: "bash -c cargo run --release --bin zetina-executor -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f32 -d /ip4/zetina-delegator/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV"
 
 networks:
   zetina-network:

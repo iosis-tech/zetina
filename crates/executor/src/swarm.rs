@@ -91,6 +91,9 @@ impl SwarmRunner {
                             SwarmEvent::NewListenAddr { address, .. } => {
                                 debug!("Local node is listening on {address}");
                             }
+                            SwarmEvent::ConnectionEstablished { peer_id, connection_id, num_established, .. } => {
+                                info!{"peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
+                            }
                             _ => {}
                         },
                         _ = shutdown_signal() => {
