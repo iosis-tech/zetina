@@ -6,6 +6,10 @@ build:
     context: .
     docker:
       dockerfile: delegator.dockerfile
+  - image: registry.internal.iosis.tech/zetina-delegator-dashboard
+    context: dashboard
+    docker:
+      dockerfile: dashboard.dockerfile
   - image: registry.internal.iosis.tech/zetina-executor
     context: .
     docker:

@@ -27,6 +27,8 @@ services:
       - RUST_LOG=info
     networks:
       - zetina-network
+    ports:
+      - "3010:3010"
 
   zetina-delegator-dashboard:
     build:
