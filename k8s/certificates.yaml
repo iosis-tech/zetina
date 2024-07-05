@@ -4,7 +4,7 @@ metadata:
   name: zetina-delegator-cert
   namespace: zetina
 spec:
-  secretName: zetina-delegator-tls
+  secretName: zetina-tls
 
   dnsNames:
   - delegator.zetina.iosis.tech

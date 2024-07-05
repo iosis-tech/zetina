@@ -52,7 +52,7 @@ spec:
   tls:
   - hosts:
     - dashboard.delegator.zetina.iosis.tech
-    secretName: zetina-delegator-dashboard-tls
+    secretName: zetina-tls
   rules:
   - host: dashboard.delegator.zetina.iosis.tech
     http:
