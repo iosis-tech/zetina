@@ -3,16 +3,14 @@ use starknet::{
     signers::{SigningKey, VerifyingKey},
 };
 
-pub struct NodeAccount
-{
+pub struct NodeAccount {
     /// Key pair for the p2p network.
     /// This represents the identity of the node in the network.
     p2p_keypair: libp2p::identity::Keypair,
     signing_key: SigningKey,
 }
 
-impl NodeAccount
-{
+impl NodeAccount {
     pub fn new(private_key: Vec<u8>) -> Self {
         let _secret_key =
             libp2p::identity::ecdsa::SecretKey::try_from_bytes(private_key.as_slice())

@@ -4,7 +4,6 @@ pub mod swarm;
 use axum::Router;
 use executor::Executor;
 use libp2p::gossipsub;
-use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use std::time::Duration;
 use swarm::SwarmRunner;
 use tokio::{net::TcpListener, sync::mpsc};
@@ -34,9 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let private_key =
         hex::decode("07c7a41c77c7a3b19e7c77485854fc88b09ed7041361595920009f81236d55d2")?;
 
-    let node_account = NodeAccount::new(
-        private_key,
-    );
+    let node_account = NodeAccount::new(private_key);
 
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);

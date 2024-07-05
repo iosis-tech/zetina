@@ -39,9 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let private_key =
         hex::decode("018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f32")?;
 
-    let node_account = NodeAccount::new(
-        private_key,
-    );
+    let node_account = NodeAccount::new(private_key);
 
     let p2p_keypair = libp2p::identity::Keypair::from(libp2p::identity::ecdsa::Keypair::generate());
 
