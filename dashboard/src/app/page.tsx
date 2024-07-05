@@ -105,7 +105,7 @@ export default function Home() {
         let subscriber: EventSource | null = null
 
         try {
-          const response = await fetch("http://localhost:3010/delegate", {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/delegate`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -126,7 +126,7 @@ export default function Home() {
           setIsProcessing(data.job_hash);
 
           subscriber = subscribeEvents(
-            "http://localhost:3010/job_events",
+            `${process.env.NEXT_PUBLIC_API_URL}/job_events`,
             `job_hash=${data.job_hash.toString()}`,
             (event) => {
               let job_event = JobEventsResponse.parse(event);
