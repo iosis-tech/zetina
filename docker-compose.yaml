@@ -1,26 +1,27 @@
 services:
-  stone-prover:
+  zetina-stone-prover:
     build:
       context: stone-prover
       dockerfile: Dockerfile
-    image: stone-prover
+    image: zetina-stone-prover
 
-  runtime:
+  zetina-runtime:
     build:
       dockerfile: runtime.dockerfile
-    image: runtime
+    image: zetina-runtime
     depends_on:
-      - stone-prover
+      - zetina-stone-prover
 
-  delegator:
+  zetina-delegator:
     build:
       dockerfile: delegator.dockerfile
+    image: zetina-delegator
     depends_on:
-      - runtime
+      - zetina-runtime
     deploy:
       resources:
         limits:
-          cpus: '8'
+          cpus: '10'
           memory: '10G'
     ports:
       - "3010:3010/tcp"
@@ -29,18 +30,17 @@ services:
     networks:
       - zetina-network
 
-  executor:
+  zetina-executor:
     build:
       dockerfile: executor.dockerfile
+    image: zetina-executor
     depends_on:
-      - runtime
+      - zetina-runtime
     deploy:
       resources:
         limits:
-          cpus: '8'
+          cpus: '10'
           memory: '10G'
-    ports:
-      - "3020:3020/tcp"
     environment:
       - RUST_LOG=info
     networks:

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: executor
+spec:
+  selector:
+    matchLabels:
+      app: executor
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: executor
+    spec:
+      containers:
+      - name: executor
+        image: registry.internal.iosis.tech/zetina-executor
+        resources:
+          requests:
+            cpu: "1"
+            memory: "1Gi"
+          limits:
+            cpu: "10"
+            memory: "10Gi"
+        env:
+        - name: RUST_LOG
+          value: "info"
+        ports:
+        - containerPort: 3010
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: executor-service
+spec:
+  selector:
+    app: executor
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3010

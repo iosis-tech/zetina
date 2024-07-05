@@ -1,0 +1,15 @@
+apiVersion: skaffold/v4beta3
+kind: Config
+build:
+  artifacts:
+  - image: registry.internal.iosis.tech/zetina-delegator
+    context: .
+    docker:
+      dockerfile: delegator.dockerfile
+  - image: registry.internal.iosis.tech/zetina-executor
+    context: .
+    docker:
+      dockerfile: executor.dockerfile
+manifests:
+  rawYaml:
+  - ./k8s/*

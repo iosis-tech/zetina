@@ -50,8 +50,8 @@ impl SwarmRunner {
             swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
         }
 
-        swarm.listen_on("/ip4/0.0.0.0/udp/5680/quic-v1".parse()?)?;
-        swarm.listen_on("/ip4/0.0.0.0/tcp/5681".parse()?)?;
+        swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
+        swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
 
         Ok(SwarmRunner {
             handle: Some(tokio::spawn(async move {
