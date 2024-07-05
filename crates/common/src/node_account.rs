@@ -12,9 +12,8 @@ pub struct NodeAccount {
 
 impl NodeAccount {
     pub fn new(private_key: Vec<u8>) -> Self {
-        let secret_key =
-            libp2p::identity::ecdsa::SecretKey::try_from_bytes(private_key.as_slice())
-                .expect("Failed to create secret key from private key.");
+        let secret_key = libp2p::identity::ecdsa::SecretKey::try_from_bytes(private_key.as_slice())
+            .expect("Failed to create secret key from private key.");
         let p2p_keypair =
             libp2p::identity::Keypair::from(libp2p::identity::ecdsa::Keypair::from(secret_key));
         let signing_key = SigningKey::from_secret_scalar(
