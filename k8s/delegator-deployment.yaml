@@ -17,9 +17,13 @@ spec:
       containers:
       - name: delegator
         image: registry.internal.iosis.tech/zetina-delegator
+        command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f34 -d /ip4/83.238.171.134/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV -d /ip4/83.238.171.134/tcp/5681/p2p/QmUEi69CXN8SXEYhkzoqJzQ6aEHTKqJzewqirBiT8FKmBu -d /ip4/83.238.171.134/tcp/5683/p2p/QmYaed2psXu4UMTXqrrRUE7PaYnwGFkvGvKvTUBCQSry4S"]
         resources:
+          requests:
+            cpu: "1"
+            memory: "1Gi"
           limits:
-            cpu: "1000m"
+            cpu: "1"
             memory: "1Gi"
         env:
         - name: RUST_LOG
@@ -43,7 +47,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: delegator-dashboard-ingress
+  name: delegator-ingress
   namespace: zetina
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
@@ -61,6 +65,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: delegator-dashboard-service
+            name: delegator-service
             port:
               number: 80

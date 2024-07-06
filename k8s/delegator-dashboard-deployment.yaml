@@ -21,9 +21,6 @@ spec:
           limits:
             cpu: "1000m"
             memory: "1Gi"
-        env:
-        - name: NEXT_PUBLIC_API_URL
-          value: "http://delegator-service.zetina.svc.cluster.local:3010"
         ports:
         - containerPort: 3000
 ---

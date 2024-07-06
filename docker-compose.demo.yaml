@@ -1,0 +1,53 @@
+services:
+  zetina-stone-prover:
+    build:
+      context: stone-prover
+      dockerfile: Dockerfile
+    image: zetina-stone-prover
+
+  zetina-runtime:
+    build:
+      dockerfile: runtime.dockerfile
+    image: zetina-runtime
+    depends_on:
+      - zetina-stone-prover
+
+  zetina-delegator:
+    build:
+      dockerfile: delegator.dockerfile
+    image: zetina-delegator
+    hostname: zetina-delegator
+    depends_on:
+      - zetina-runtime
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+    environment:
+      - RUST_LOG=info
+    networks:
+      - zetina-network
+    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f34 -d /ip4/83.238.171.134/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV -d /ip4/83.238.171.134/tcp/5681/p2p/QmUEi69CXN8SXEYhkzoqJzQ6aEHTKqJzewqirBiT8FKmBu -d /ip4/83.238.171.134/tcp/5683/p2p/QmYaed2psXu4UMTXqrrRUE7PaYnwGFkvGvKvTUBCQSry4S"]
+    ports:
+     - "3010:3010"
+
+  zetina-delegator-dashboard:
+    build:
+      context: dashboard
+      dockerfile: dashboard.dockerfile
+    image: zetina-delegator-dashboard
+    hostname: zetina-delegator-dashboard
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+    networks:
+      - zetina-network
+    ports:
+     - "3000:3000"
+
+networks:
+  zetina-network:
+    driver: bridge

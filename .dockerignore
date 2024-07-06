@@ -33,3 +33,4 @@ build/
 .dockerignore.custom
 .dockerignore.local
 
+k8s/

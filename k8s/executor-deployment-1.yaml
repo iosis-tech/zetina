@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: executor-1
+  namespace: zetina
+spec:
+  selector:
+    matchLabels:
+      app: executor-1
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: executor-1
+    spec:
+      containers:
+      - name: executor-1
+        image: registry.internal.iosis.tech/zetina-executor
+        command: ["bash", "-ci", "cargo run --release --bin zetina-executor -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f31"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "10"
+            memory: "10Gi"
+        env:
+        - name: RUST_LOG
+          value: "info"
+        ports:
+        - containerPort: 3010
+        - containerPort: 5678
+        - containerPort: 5679
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: executor-1-service
+  namespace: zetina
+  annotations:
+    kube-vip.io/loadbalancerIPs: "0.0.0.0"
+    kube-vip.io/hwaddr: "00:00:6C:32:98:82"
+    kube-vip.io/loadbalancerHostname: "zetina-executor-1"
+spec:
+  ports:
+  - port: 5678
+    targetPort: 5678
+    protocol: UDP
+    name: p2p-quic-port
+  - port: 5679
+    targetPort: 5679
+    protocol: TCP
+    name: p2p-tcp-port
+  selector:
+    app: executor-1
+  type: LoadBalancer
