@@ -1,24 +1,9 @@
 services:
-  zetina-stone-prover:
-    build:
-      context: stone-prover
-      dockerfile: Dockerfile
-    image: zetina-stone-prover
-
-  zetina-runtime:
-    build:
-      dockerfile: runtime.dockerfile
-    image: zetina-runtime
-    depends_on:
-      - zetina-stone-prover
-
   zetina-delegator:
     build:
       dockerfile: delegator.dockerfile
     image: zetina-delegator
     hostname: zetina-delegator
-    depends_on:
-      - zetina-runtime
     deploy:
       resources:
         limits:
@@ -38,6 +23,8 @@ services:
       dockerfile: dashboard.dockerfile
     image: zetina-delegator-dashboard
     hostname: zetina-delegator-dashboard
+    depends_on:
+      - zetina-delegator
     deploy:
       resources:
         limits:
