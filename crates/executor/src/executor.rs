@@ -92,7 +92,7 @@ impl Executor {
                         && !job_record.is_empty()
                     {
                         if let Some(job) = job_record.take_job().await {
-                            if let Some(event) = events_rx.recv().await {
+                            if let Ok(event) = events_rx.try_recv() {
                                 match event {
                                     Event::Message { message, .. } => {
                                         // Received a new-job message from the network
