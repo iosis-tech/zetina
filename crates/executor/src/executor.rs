@@ -116,7 +116,8 @@ impl Executor {
                                             )
                                             .into()
                                         {
-                                            let job_removed: Job = serde_json::from_slice(&message.data)?;
+                                            let job_removed: Job =
+                                                serde_json::from_slice(&message.data)?;
                                             info!("Received picked job event: {}", hash!(&job));
                                             job_record.remove_job(&job_removed);
                                             if hash!(job_removed) == hash!(job) {
