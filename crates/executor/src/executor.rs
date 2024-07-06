@@ -91,30 +91,49 @@ impl Executor {
                     if runner_scheduler.len() + prover_scheduler.len() < MAX_PARALLEL_JOBS
                         && !job_record.is_empty()
                     {
-                        if let Some(job) = job_record.take_job().await { 
+                        if let Some(job) = job_record.take_job().await {
                             if let Some(event) = events_rx.recv().await {
                                 match event {
                                     Event::Message { message, .. } => {
                                         // Received a new-job message from the network
-                                        if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::NewJob).into() {
+                                        if message.topic
+                                            == gossipsub_ident_topic(
+                                                Network::Sepolia,
+                                                Topic::NewJob,
+                                            )
+                                            .into()
+                                        {
                                             let job: Job = serde_json::from_slice(&message.data)?;
                                             info!("Received a new job event: {}", hash!(&job));
                                             job_record.register_job(job);
-    
                                         }
                                         // Received a picked-job message from the network
-                                        if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {
+                                        if message.topic
+                                            == gossipsub_ident_topic(
+                                                Network::Sepolia,
+                                                Topic::PickedJob,
+                                            )
+                                            .into()
+                                        {
                                             let job: Job = serde_json::from_slice(&message.data)?;
                                             info!("Received picked job event: {}", hash!(&job));
                                             job_record.remove_job(&job);
                                         }
-                                    },
+                                    }
                                     Event::Subscribed { peer_id, topic } => {
-                                        info!("{} subscribed to the topic {}", peer_id.to_string(), topic.to_string());
-                                    },
-                                    Event::Unsubscribed { peer_id, topic }=> {
-                                        info!("{} unsubscribed to the topic {}", peer_id.to_string(), topic.to_string());
-                                    },
+                                        info!(
+                                            "{} subscribed to the topic {}",
+                                            peer_id.to_string(),
+                                            topic.to_string()
+                                        );
+                                    }
+                                    Event::Unsubscribed { peer_id, topic } => {
+                                        info!(
+                                            "{} unsubscribed to the topic {}",
+                                            peer_id.to_string(),
+                                            topic.to_string()
+                                        );
+                                    }
                                     _ => {}
                                 }
                             };
