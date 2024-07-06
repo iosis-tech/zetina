@@ -92,6 +92,7 @@ impl Executor {
                         && !job_record.is_empty()
                     {
                         if let Some(job) = job_record.take_job().await {
+                            let mut flag = false;
                             if let Ok(event) = events_rx.try_recv() {
                                 match event {
                                     Event::Message { message, .. } => {
@@ -115,9 +116,12 @@ impl Executor {
                                             )
                                             .into()
                                         {
-                                            let job: Job = serde_json::from_slice(&message.data)?;
+                                            let job_removed: Job = serde_json::from_slice(&message.data)?;
                                             info!("Received picked job event: {}", hash!(&job));
-                                            job_record.remove_job(&job);
+                                            job_record.remove_job(&job_removed);
+                                            if hash!(job_removed) == hash!(job) {
+                                                flag = true;
+                                            }
                                         }
                                     }
                                     Event::Subscribed { peer_id, topic } => {
@@ -137,12 +141,14 @@ impl Executor {
                                     _ => {}
                                 }
                             };
-                            let serialized_job = serde_json::to_string(&job)?;
-                            picked_job_topic_tx.send(serialized_job.into()).await?;
-                            info!("Sent picked job event: {}", hash!(&job));
+                            if flag == false {
+                                let serialized_job = serde_json::to_string(&job)?;
+                                picked_job_topic_tx.send(serialized_job.into()).await?;
+                                info!("Sent picked job event: {}", hash!(&job));
 
-                            info!("Scheduled run of job: {}", hash!(&job));
-                            runner_scheduler.push(runner.run(job)?);
+                                info!("Scheduled run of job: {}", hash!(&job));
+                                runner_scheduler.push(runner.run(job)?);
+                            }
                         }
                     }
                 }
