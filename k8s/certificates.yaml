@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zetina-delegator-cert
+  namespace: zetina
+spec:
+  secretName: zetina-tls
+
+  dnsNames:
+  - delegator.zetina.iosis.tech
+  - dashboard.delegator.zetina.iosis.tech
+  issuerRef:
+    name: letsencrypt-http01
+    kind: Issuer

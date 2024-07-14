@@ -1,51 +1,60 @@
 services:
-  stone-prover:
+  zetina-stone-prover:
     build:
       context: stone-prover
       dockerfile: Dockerfile
-    image: stone-prover
+    image: zetina-stone-prover
 
-  runtime:
+  zetina-runtime:
     build:
       dockerfile: runtime.dockerfile
-    image: runtime
+    image: zetina-runtime
     depends_on:
-      - stone-prover
+      - zetina-stone-prover
 
-  delegator:
+  zetina-delegator:
     build:
       dockerfile: delegator.dockerfile
+    image: zetina-delegator
+    hostname: zetina-delegator
     depends_on:
-      - runtime
+      - zetina-runtime
+      - zetina-executor
     deploy:
       resources:
         limits:
-          cpus: '8'
+          cpus: '10'
           memory: '10G'
-    ports:
-      - "3010:3010/tcp"
     environment:
       - RUST_LOG=info
     networks:
-      - zetina-network
+      zetina-network:
+        ipv4_address: 172.16.238.3
+    ports:
+      - "3010:3010"
+    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f32 -d /ip4/172.16.238.2/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV"]
 
-  executor:
+  zetina-executor:
     build:
       dockerfile: executor.dockerfile
+    image: zetina-executor
     depends_on:
-      - runtime
+      - zetina-runtime
     deploy:
       resources:
         limits:
-          cpus: '8'
+          cpus: '10'
           memory: '10G'
-    ports:
-      - "3020:3020/tcp"
     environment:
       - RUST_LOG=info
     networks:
-      - zetina-network
+      zetina-network:
+        ipv4_address: 172.16.238.2
+    command: ["bash", "-ci", "cargo run --release --bin zetina-executor -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f31"]
 
 networks:
   zetina-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.238.0/24

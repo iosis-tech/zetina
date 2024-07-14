@@ -1,5 +1,5 @@
 # Stage 1: Use the stone-prover image to copy the executable
-FROM stone-prover AS stone-prover
+FROM zetina-stone-prover AS zetina-stone-prover
 
 # Stage 2: Use a Debian-based Linux distribution as the base image
 FROM --platform=linux/amd64 debian:stable-slim
@@ -60,8 +60,8 @@ RUN mkdir -p /root/.local/bin && \
     echo 'export PATH="/root/.local/bin:$PATH"' >> /root/.bashrc
 
 # Copy the executable from stone-prover image
-COPY --from=stone-prover /bin/cpu_air_prover /root/.local/bin/
-COPY --from=stone-prover /bin/cpu_air_verifier /root/.local/bin/
+COPY --from=zetina-stone-prover /bin/cpu_air_prover /root/.local/bin/
+COPY --from=zetina-stone-prover /bin/cpu_air_verifier /root/.local/bin/
 
 # Set the working directory
 WORKDIR /zetina

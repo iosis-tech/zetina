@@ -1,0 +1,63 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: delegator-dashboard
+  namespace: zetina
+spec:
+  selector:
+    matchLabels:
+      app: delegator-dashboard
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: delegator-dashboard
+    spec:
+      containers:
+      - name: delegator-dashboard
+        image: registry.internal.iosis.tech/zetina-delegator-dashboard
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: delegator-dashboard-service
+  namespace: zetina
+spec:
+  selector:
+    app: delegator-dashboard
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: delegator-dashboard-ingress
+  namespace: zetina
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  ingressClassName: nginx-ingress-prod
+  tls:
+  - hosts:
+    - dashboard.delegator.zetina.iosis.tech
+    secretName: zetina-tls
+  rules:
+  - host: dashboard.delegator.zetina.iosis.tech
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: delegator-dashboard-service
+            port:
+              number: 80

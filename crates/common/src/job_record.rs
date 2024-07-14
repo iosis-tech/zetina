@@ -26,7 +26,7 @@ where
         // add random wait to simulate network overhead
         let random = {
             let mut rng = rand::thread_rng();
-            rng.gen_range(0..1000)
+            rng.gen_range(0..2000)
         };
         tokio::time::sleep(std::time::Duration::from_millis(random)).await;
         self.ordered_set.pop_last()

@@ -2,18 +2,18 @@ use futures::StreamExt;
 use libp2p::gossipsub::{self, IdentTopic};
 use libp2p::identity::Keypair;
 use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
-use libp2p::{mdns, noise, tcp, yamux, SwarmBuilder};
+use libp2p::{noise, tcp, yamux, Multiaddr, SwarmBuilder};
 use std::error::Error;
+use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
 
 #[derive(NetworkBehaviour)]
 pub struct PeerBehaviour {
     gossipsub: gossipsub::Behaviour,
-    mdns: mdns::tokio::Behaviour,
 }
 
 pub struct SwarmRunner {
@@ -22,17 +22,14 @@ pub struct SwarmRunner {
 
 impl SwarmRunner {
     pub fn new(
+        dial_addresses: Vec<String>,
         p2p_local_keypair: &Keypair,
         subscribe_topics: Vec<IdentTopic>,
         mut transmit_topics: Vec<(IdentTopic, mpsc::Receiver<Vec<u8>>)>,
         swarm_events_tx: mpsc::Sender<gossipsub::Event>,
     ) -> Result<Self, Box<dyn Error>> {
-        let mdns = mdns::tokio::Behaviour::new(
-            mdns::Config::default(),
-            p2p_local_keypair.public().to_peer_id(),
-        )?;
         let gossipsub = Self::init_gossip(p2p_local_keypair)?;
-        let behaviour = PeerBehaviour { gossipsub, mdns };
+        let behaviour = PeerBehaviour { gossipsub };
         let local_keypair = p2p_local_keypair.clone();
         let mut swarm = SwarmBuilder::with_existing_identity(local_keypair)
             .with_tokio()
@@ -50,8 +47,15 @@ impl SwarmRunner {
             swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
         }
 
-        swarm.listen_on("/ip4/0.0.0.0/udp/5680/quic-v1".parse()?)?;
-        swarm.listen_on("/ip4/0.0.0.0/tcp/5681".parse()?)?;
+        swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
+        swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
+
+        // Reach out to other nodes if specified
+        for to_dial in dial_addresses {
+            let addr: Multiaddr = Multiaddr::from_str(&to_dial)?;
+            swarm.dial(addr)?;
+            info!("Dialed {to_dial:?}")
+        }
 
         Ok(SwarmRunner {
             handle: Some(tokio::spawn(async move {
@@ -77,18 +81,6 @@ impl SwarmRunner {
                             }
                         },
                         event = swarm.select_next_some() => match event {
-                            SwarmEvent::Behaviour(PeerBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                                for (peer_id, _multiaddr) in list {
-                                    debug!("mDNS discovered a new peer: {peer_id}");
-                                    swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-                                }
-                            },
-                            SwarmEvent::Behaviour(PeerBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                                for (peer_id, _multiaddr) in list {
-                                    debug!("mDNS discover peer has expired: {peer_id}");
-                                    swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                                }
-                            },
                             SwarmEvent::Behaviour(PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                                 propagation_source,
                                 message_id,
@@ -98,6 +90,14 @@ impl SwarmRunner {
                             },
                             SwarmEvent::NewListenAddr { address, .. } => {
                                 debug!("Local node is listening on {address}");
+                            }
+                            SwarmEvent::ConnectionEstablished { peer_id, connection_id, num_established, .. } => {
+                                info!{"ConnectionEstablished: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
+                                swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                            }
+                            SwarmEvent::ConnectionClosed { peer_id, connection_id, num_established, .. } => {
+                                info!{"ConnectionClosed: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
+                                swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                             }
                             _ => {}
                         },

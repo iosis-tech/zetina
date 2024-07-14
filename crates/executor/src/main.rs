@@ -2,9 +2,9 @@ pub mod executor;
 pub mod swarm;
 
 use axum::Router;
+use clap::Parser;
 use executor::Executor;
 use libp2p::gossipsub;
-use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use std::time::Duration;
 use swarm::SwarmRunner;
 use tokio::{net::TcpListener, sync::mpsc};
@@ -19,9 +19,22 @@ use zetina_common::{
 use zetina_prover::stone_prover::StoneProver;
 use zetina_runner::cairo_runner::CairoRunner;
 
+#[derive(Parser)]
+struct Cli {
+    /// The private key as a hex string
+    #[arg(short, long)]
+    private_key: String,
+
+    #[arg(short, long)]
+    dial_addresses: Vec<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
+
+    // Parse command line arguments
+    let cli = Cli::parse();
 
     let ws_root = std::path::PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"),
@@ -31,18 +44,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO: common setup in node initiate binary
     let network = Network::Sepolia;
-    let private_key =
-        hex::decode("07c7a41c77c7a3b19e7c77485854fc88b09ed7041361595920009f81236d55d2")?;
-    let account_address =
-        hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
-    let url = "https://starknet-sepolia.public.blastapi.io";
+    let private_key = hex::decode(cli.private_key)?;
 
-    let node_account = NodeAccount::new(
-        private_key,
-        account_address,
-        network,
-        JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)),
-    );
+    let node_account = NodeAccount::new(private_key);
 
     // Generate topic
     let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
@@ -54,6 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (finished_job_topic_tx, finished_job_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
 
     SwarmRunner::new(
+        cli.dial_addresses,
         node_account.get_keypair(),
         vec![new_job_topic, picked_job_topic.to_owned(), finished_job_topic.to_owned()],
         vec![
@@ -70,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Executor::new(swarm_events_rx, finished_job_topic_tx, picked_job_topic_tx, runner, prover);
 
     // Create a `TcpListener` using tokio.
-    let listener = TcpListener::bind("0.0.0.0:3020").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();
 
     // Run the server with graceful shutdown
     axum::serve(

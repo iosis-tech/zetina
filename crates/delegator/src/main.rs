@@ -7,9 +7,9 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use clap::Parser;
 use delegator::Delegator;
 use libp2p::gossipsub;
-use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
 use std::time::Duration;
 use swarm::SwarmRunner;
 use tokio::{
@@ -31,24 +31,28 @@ use zetina_common::{
     topic::{gossipsub_ident_topic, Topic},
 };
 
+#[derive(Parser)]
+struct Cli {
+    /// The private key as a hex string
+    #[arg(short, long)]
+    private_key: String,
+
+    #[arg(short, long)]
+    dial_addresses: Vec<String>,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()).try_init();
 
+    // Parse command line arguments
+    let cli = Cli::parse();
+
     // TODO: common setup in node initiate binary
     let network = Network::Sepolia;
-    let private_key =
-        hex::decode("018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f32")?;
-    let account_address =
-        hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
-    let url = "https://starknet-sepolia.public.blastapi.io";
+    let private_key = hex::decode(cli.private_key)?;
 
-    let node_account = NodeAccount::new(
-        private_key,
-        account_address,
-        network,
-        JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)),
-    );
+    let node_account = NodeAccount::new(private_key);
 
     // Generate topic
     let job_topic = gossipsub_ident_topic(network, Topic::NewJob);
@@ -62,6 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (job_topic_tx, job_topic_rx) = mpsc::channel::<Vec<u8>>(100);
 
     SwarmRunner::new(
+        cli.dial_addresses,
         node_account.get_keypair(),
         vec![job_topic.to_owned(), picked_job_topic, finished_job_topic],
         vec![(job_topic, job_topic_rx)],

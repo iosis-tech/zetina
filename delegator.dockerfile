@@ -1,11 +1,14 @@
-# Use the base runtime image
-FROM runtime
+# Use the official Rust image from the Docker Hub
+FROM rust:latest
 
-# Build
+# Set the working directory inside the container
+WORKDIR /zetina-delegator
+
+# Copy the rest of the application source code
+COPY . .
+
+# Build the application in release mode
 RUN cargo build --release --bin zetina-delegator
 
 # Expose necessary ports
-EXPOSE 5678/udp 5679/tcp 50051/tcp
-
-# Set the default command to run when the container starts
-CMD ["bash", "-ci", "cargo run --release --bin zetina-delegator"]
+EXPOSE 5678/udp 5679/tcp 3010/tcp
