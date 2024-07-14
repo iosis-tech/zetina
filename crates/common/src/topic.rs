@@ -14,6 +14,7 @@ use crate::network::Network;
 pub enum Topic {
     NewJob,
     PickedJob,
+    FinishedJob,
 }
 
 impl Topic {
@@ -21,6 +22,7 @@ impl Topic {
         match self {
             Topic::NewJob => "new-job",
             Topic::PickedJob => "picked-job",
+            Topic::FinishedJob => "finished-job",
         }
     }
 }

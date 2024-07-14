@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y \
     git \
     libgmp-dev \
     libdw1 \
+    protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust using Rustup
@@ -75,3 +76,6 @@ RUN pip install -r requirements.txt && \
 
 # Copy the current directory content into the container
 COPY . .
+
+# Build
+RUN cargo build --release

@@ -1,2 +1,32 @@
-target
-*docker*
+# Ignore Python virtual environment
+venv/
+env/
+
+# Ignore Rust-related files
+debug/
+target/
+Cargo.lock
+*.rs.bk
+*.pdb
+/target
+Scarb.lock
+.snfoundry_cache/
+stone-prover
+bootloader*.json
+
+# Ignore Python-specific files
+*.pyc
+__pycache__/
+dist/
+build/
+*.egg-info/
+
+# Ignore IPython/Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Additional Docker-specific ignores
+.dockerignore
+.dockerignore.template
+.dockerignore.generated
+.dockerignore.custom
+.dockerignore.local

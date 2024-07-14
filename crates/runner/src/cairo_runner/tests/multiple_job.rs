@@ -10,8 +10,7 @@ async fn run_multiple_jobs() {
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let identity = SigningKey::from_random().verifying_key();
-    let runner = CairoRunner::new(fixture1.program_path, &identity);
+    let runner = CairoRunner::new(fixture1.program_path, SigningKey::from_random().verifying_key());
     let mut futures = FuturesUnordered::new();
 
     let job1 = runner.run(fixture1.job).unwrap();
@@ -30,8 +29,7 @@ async fn abort_multiple_jobs() {
     let fixture1 = fixture();
     let fixture2 = fixture();
 
-    let identity = SigningKey::from_random().verifying_key();
-    let runner = CairoRunner::new(fixture1.program_path, &identity);
+    let runner = CairoRunner::new(fixture1.program_path, SigningKey::from_random().verifying_key());
     let mut futures = FuturesUnordered::new();
 
     let job1 = runner.run(fixture1.job).unwrap();

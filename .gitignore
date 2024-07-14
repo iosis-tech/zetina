@@ -27,3 +27,22 @@ Scarb.lock
 stone-prover
 
 bootloader*.json
+
+# Python
+*.pyc
+__pycache__/
+venv/
+env/
+dist/
+build/
+*.egg-info/
+
+# PyInstaller
+dist/
+build/
+
+# IPython Notebook
+.ipynb_checkpoints
+
+# Jupyter Notebook
+.ipynb_checkpoints/

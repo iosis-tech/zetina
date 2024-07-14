@@ -1,11 +1,7 @@
 use crate::{errors::CompilerControllerError, traits::CompilerController};
 use async_process::Stdio;
 use futures::Future;
-use rand::{thread_rng, Rng};
-use serde_json::json;
 use starknet::signers::SigningKey;
-use starknet_crypto::FieldElement;
-use std::io::Write;
 use std::path::PathBuf;
 use std::{io::Read, pin::Pin};
 use tempfile::NamedTempFile;
@@ -19,12 +15,11 @@ pub mod tests;
 
 pub struct CairoCompiler<'identity> {
     signing_key: &'identity SigningKey,
-    registry_contract: FieldElement,
 }
 
 impl<'identity> CairoCompiler<'identity> {
-    pub fn new(signing_key: &'identity SigningKey, registry_contract: FieldElement) -> Self {
-        Self { signing_key, registry_contract }
+    pub fn new(signing_key: &'identity SigningKey) -> Self {
+        Self { signing_key }
     }
 }
 
@@ -32,97 +27,82 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
     fn run(
         &self,
         program_path: PathBuf,
-        _program_input_path: PathBuf,
+        program_input_path: PathBuf,
     ) -> Result<Process<Result<Job, CompilerControllerError>>, CompilerControllerError> {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
-        let future: Pin<Box<dyn Future<Output = Result<Job, CompilerControllerError>> + '_>> =
-            Box::pin(async move {
-                let layout: &str = Layout::RecursiveWithPoseidon.into();
+        let future: Pin<
+            Box<dyn Future<Output = Result<Job, CompilerControllerError>> + Send + '_>,
+        > = Box::pin(async move {
+            let layout: &str = Layout::RecursiveWithPoseidon.into();
 
-                let output = NamedTempFile::new()?;
+            let output = NamedTempFile::new()?;
 
-                let mut task = Command::new("cairo-compile")
-                    .arg(program_path.as_path())
-                    .arg("--output")
-                    .arg(output.path())
-                    .arg("--proof_mode")
-                    .stdout(Stdio::null())
-                    .spawn()?;
+            let mut task = Command::new("cairo-compile")
+                .arg(program_path.as_path())
+                .arg("--output")
+                .arg(output.path())
+                .arg("--proof_mode")
+                .stdout(Stdio::null())
+                .spawn()?;
 
-                debug!("program {:?} is compiling... ", program_path);
+            debug!("program {:?} is compiling... ", program_path);
 
-                loop {
-                    select! {
-                        output = task.wait() => {
-                            debug!("{:?}", output);
-                            if !output?.success() {
-                                return Err(CompilerControllerError::TaskTerminated);
-                            }
-                            let output = task.wait_with_output().await?;
-                            debug!("{:?}", output);
-                            break;
+            loop {
+                select! {
+                    output = task.wait() => {
+                        debug!("{:?}", output);
+                        if !output?.success() {
+                            return Err(CompilerControllerError::TaskTerminated);
                         }
-                        Some(()) = terminate_rx.recv() => {
-                            task.start_kill()?;
-                        }
+                        let output = task.wait_with_output().await?;
+                        debug!("{:?}", output);
+                        break;
+                    }
+                    Some(()) = terminate_rx.recv() => {
+                        task.start_kill()?;
                     }
                 }
+            }
 
-                // TODO remove it is just to make every job a little diffirent for testing purposes
-                let mut random_input = NamedTempFile::new()?;
-                let mut rng = thread_rng();
-                random_input.write_all(
-                    json!({
-                        "fibonacci_claim_index": rng.gen_range(10..10000)
-                    })
-                    .to_string()
-                    .as_bytes(),
-                )?;
+            let mut cairo_pie = NamedTempFile::new()?;
 
-                // output
-                let mut cairo_pie = NamedTempFile::new()?;
+            let mut task = Command::new("cairo-run")
+                .arg("--program")
+                .arg(output.path())
+                .arg("--layout")
+                .arg(layout)
+                .arg("--program_input")
+                .arg(program_input_path)
+                .arg("--cairo_pie_output")
+                .arg(cairo_pie.path())
+                .arg("--print_output")
+                .stdout(Stdio::null())
+                .spawn()?;
 
-                let mut task = Command::new("cairo-run")
-                    .arg("--program")
-                    .arg(output.path())
-                    .arg("--layout")
-                    .arg(layout)
-                    .arg("--program_input")
-                    .arg(random_input.path())
-                    .arg("--cairo_pie_output")
-                    .arg(cairo_pie.path())
-                    .arg("--print_output")
-                    .stdout(Stdio::null())
-                    .spawn()?;
+            debug!("program {:?} is generating PIE... ", program_path);
 
-                debug!("program {:?} is generating PIE... ", program_path);
-
-                loop {
-                    select! {
-                        output = task.wait() => {
-                            debug!("{:?}", output);
-                            if !output?.success() {
-                                return Err(CompilerControllerError::TaskTerminated);
-                            }
-                            let output = task.wait_with_output().await?;
-                            debug!("{:?}", output);
-                            break;
+            loop {
+                select! {
+                    output = task.wait() => {
+                        debug!("{:?}", output);
+                        if !output?.success() {
+                            return Err(CompilerControllerError::TaskTerminated);
                         }
-                        Some(()) = terminate_rx.recv() => {
-                            task.start_kill()?;
-                        }
+                        let output = task.wait_with_output().await?;
+                        debug!("{:?}", output);
+                        break;
+                    }
+                    Some(()) = terminate_rx.recv() => {
+                        task.start_kill()?;
                     }
                 }
+            }
 
-                // cairo run had finished
-                let mut cairo_pie_compressed = Vec::new();
-                cairo_pie.read_to_end(&mut cairo_pie_compressed)?;
+            let mut cairo_pie_compressed = Vec::new();
+            cairo_pie.read_to_end(&mut cairo_pie_compressed)?;
 
-                Ok(Job::try_from_job_data(
-                    JobData::new(0, cairo_pie_compressed, self.registry_contract),
-                    self.signing_key,
-                ))
-            });
+            Ok(Job::try_from_job_data(JobData::new(0, cairo_pie_compressed), self.signing_key))
+        });
 
         Ok(Process::new(future, terminate_tx))
     }

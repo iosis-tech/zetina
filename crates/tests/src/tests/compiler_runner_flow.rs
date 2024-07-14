@@ -1,7 +1,6 @@
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
 use starknet::signers::SigningKey;
-use starknet_crypto::FieldElement;
 use zetina_compiler::cairo_compiler::tests::models::fixture as compiler_fixture;
 use zetina_compiler::cairo_compiler::CairoCompiler;
 use zetina_compiler::traits::CompilerController;
@@ -15,9 +14,9 @@ async fn run_single_job() {
     let runner_fixture = runner_fixture();
 
     let compiler_identity = SigningKey::from_random();
-    let compiler = CairoCompiler::new(&compiler_identity, FieldElement::ZERO);
-    let runner_identity = SigningKey::from_random().verifying_key();
-    let runner = CairoRunner::new(runner_fixture.program_path, &runner_identity);
+    let compiler = CairoCompiler::new(&compiler_identity);
+    let runner =
+        CairoRunner::new(runner_fixture.program_path, SigningKey::from_random().verifying_key());
 
     compiler
         .run(compiler_fixture.program_path, compiler_fixture.program_input_path)
@@ -38,9 +37,9 @@ async fn run_multiple_job() {
     let runner_fixture1 = runner_fixture();
 
     let compiler_identity = SigningKey::from_random();
-    let compiler = CairoCompiler::new(&compiler_identity, FieldElement::ZERO);
-    let runner_identity = SigningKey::from_random().verifying_key();
-    let runner = CairoRunner::new(runner_fixture1.program_path, &runner_identity);
+    let compiler = CairoCompiler::new(&compiler_identity);
+    let runner =
+        CairoRunner::new(runner_fixture1.program_path, SigningKey::from_random().verifying_key());
 
     let mut futures = FuturesUnordered::new();
 

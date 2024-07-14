@@ -1,5 +1,5 @@
 use crate::hash;
-use starknet_crypto::FieldElement;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     hash::{DefaultHasher, Hash, Hasher},
@@ -8,13 +8,20 @@ use std::{
 /*
     Job Witness Object
     This object represents the output from the proving process.
-    It holds a serialized proof as an array of FieldElement objects.
+    It holds a serialized proof as an array of bytes.
     This serialized proof can be deserialized into a StarkProof object by the verifier to proceed with the verification of the statement.
 */
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct JobWitness {
-    pub proof: Vec<FieldElement>, // Serialized proof
+    pub job_hash: u64,
+    pub proof: Vec<u8>,
+}
+
+impl Hash for JobWitness {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.proof.hash(state);
+    }
 }
 
 impl Display for JobWitness {

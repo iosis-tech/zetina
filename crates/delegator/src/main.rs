@@ -1,30 +1,35 @@
-#![deny(unused_crate_dependencies)]
+pub mod api;
+pub mod delegator;
+pub mod swarm;
 
-use futures::{stream::FuturesUnordered, StreamExt};
-use libp2p::gossipsub::Event;
-use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
-use std::hash::{DefaultHasher, Hash, Hasher};
-use tokio::{
-    io::{stdin, AsyncBufReadExt, BufReader},
-    sync::mpsc,
+use api::ServerState;
+use axum::{
+    routing::{get, post},
+    Router,
 };
-use tracing::{debug, info};
+use delegator::Delegator;
+use libp2p::gossipsub;
+use starknet::providers::{jsonrpc::HttpTransport, JsonRpcClient, Url};
+use std::time::Duration;
+use swarm::SwarmRunner;
+use tokio::{
+    net::TcpListener,
+    sync::{broadcast, mpsc},
+};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    timeout::TimeoutLayer,
+    trace::TraceLayer,
+};
 use tracing_subscriber::EnvFilter;
 use zetina_common::{
     graceful_shutdown::shutdown_signal,
-    hash,
     job::Job,
+    job_witness::JobWitness,
     network::Network,
     node_account::NodeAccount,
-    process::Process,
     topic::{gossipsub_ident_topic, Topic},
 };
-use zetina_compiler::{
-    cairo_compiler::{tests::models::fixture, CairoCompiler},
-    errors::CompilerControllerError,
-    traits::CompilerController,
-};
-use zetina_peer::{registry::RegistryHandler, swarm::SwarmRunner};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,9 +43,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         hex::decode("cdd51fbc4e008f4ef807eaf26f5043521ef5931bbb1e04032a25bd845d286b")?;
     let url = "https://starknet-sepolia.public.blastapi.io";
 
-    let mut registry_handler =
-        RegistryHandler::new(JsonRpcClient::new(HttpTransport::new(Url::parse(url)?)));
-    let registry_address = registry_handler.get_registry_address();
     let node_account = NodeAccount::new(
         private_key,
         account_address,
@@ -49,73 +51,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Generate topic
-    let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
+    let job_topic = gossipsub_ident_topic(network, Topic::NewJob);
     let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
+    let finished_job_topic = gossipsub_ident_topic(network, Topic::FinishedJob);
 
-    let mut swarm_runner = SwarmRunner::new(
+    let (swarm_events_tx, swarm_events_rx) = mpsc::channel::<gossipsub::Event>(100);
+    let (job_picked_tx, job_picked_rx) = broadcast::channel::<Job>(100);
+    let (job_witness_tx, job_witness_rx) = broadcast::channel::<JobWitness>(100);
+
+    let (job_topic_tx, job_topic_rx) = mpsc::channel::<Vec<u8>>(100);
+
+    SwarmRunner::new(
         node_account.get_keypair(),
-        &[new_job_topic.to_owned(), picked_job_topic],
+        vec![job_topic.to_owned(), picked_job_topic, finished_job_topic],
+        vec![(job_topic, job_topic_rx)],
+        swarm_events_tx,
     )?;
 
-    let (send_topic_tx, send_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
-    let mut message_stream = swarm_runner.run(new_job_topic, send_topic_rx);
-    let mut event_stream = registry_handler.subscribe_events(vec!["0x0".to_string()]);
+    Delegator::new(job_picked_tx, job_witness_tx, swarm_events_rx);
 
-    let compiler = CairoCompiler::new(node_account.get_signing_key(), registry_address);
+    // Create a `TcpListener` using tokio.
+    let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();
 
-    let mut compiler_scheduler =
-        FuturesUnordered::<Process<'_, Result<Job, CompilerControllerError>>>::new();
-
-    // Read cairo program path from stdin
-    let mut stdin = BufReader::new(stdin()).lines();
-
-    loop {
-        tokio::select! {
-            Ok(Some(_)) = stdin.next_line() => {
-                // TODO: handle fixture better way
-                let fixture = fixture();
-                compiler_scheduler.push(compiler.run(fixture.program_path.clone(), fixture.program_input_path)?);
-                info!("Scheduled compiling program at path: {:?}", fixture.program_path);
-
-            },
-            Some(event) = message_stream.next() => {
-                match event {
-                    Event::Message { message, .. } => {
-                        // Received a new-job message from the network
-                        if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::NewJob).into() {
-                            let job: Job = serde_json::from_slice(&message.data).unwrap();
-                            info!("Received a new job event: {}", hash!(&job));
-
-                        }
-                        // Received a picked-job message from the network
-                        if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {
-                            let job: Job = serde_json::from_slice(&message.data).unwrap();
-                            info!("Received picked job event: {}", hash!(&job));
-                        }
-                    },
-                    Event::Subscribed { peer_id, topic } => {
-                        info!("{} subscribed to the topic {}", peer_id.to_string(), topic.to_string());
-                    },
-                    Event::Unsubscribed { peer_id, topic }=> {
-                        info!("{} unsubscribed to the topic {}", peer_id.to_string(), topic.to_string());
-                    },
-                    _ => {}
-                }
-            },
-            Some(Ok(event_vec)) = event_stream.next() => {
-                debug!("{:?}", event_vec);
-            },
-            Some(Ok(job)) = compiler_scheduler.next() => {
-                let serialized_job = serde_json::to_string(&job).unwrap();
-                send_topic_tx.send(serialized_job.into()).await?;
-                info!("Sent a new job: {}", hash!(&job));
-            },
-            _ = shutdown_signal() => {
-                break
-            }
-            else => break
-        }
-    }
-
+    // Run the server with graceful shutdown
+    axum::serve(
+        listener,
+        Router::new()
+            .route("/delegate", post(api::deletage_handler))
+            .route("/job_events", get(api::job_events_handler))
+            .layer((
+                TraceLayer::new_for_http(),
+                // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
+                // requests don't hang forever.
+                TimeoutLayer::new(Duration::from_secs(10)),
+                CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any),
+            ))
+            .with_state(ServerState {
+                signing_key: node_account.get_signing_key().to_owned(),
+                job_topic_tx,
+                job_picked_rx,
+                job_witness_rx,
+            }),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }

@@ -21,9 +21,9 @@ use tempfile::NamedTempFile;
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub job_data: JobData,
-    pub public_key: FieldElement, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
-    pub signature_r: FieldElement, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
-    pub signature_s: FieldElement, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relationship
+    pub public_key: FieldElement, // The public key of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relation
+    pub signature_r: FieldElement, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relation
+    pub signature_s: FieldElement, // The signature of the delegator, used in the bootloader stage to confirm authenticity of the Job<->Delegator relation
 }
 
 impl Job {
@@ -48,18 +48,12 @@ pub struct JobData {
     pub num_of_steps: u64,
     #[serde(with = "chunk_felt_array")]
     pub cairo_pie_compressed: Vec<u8>,
-    pub registry_address: FieldElement,
 }
 
 impl JobData {
-    pub fn new(reward: u64, cairo_pie_compressed: Vec<u8>, registry_address: FieldElement) -> Self {
+    pub fn new(reward: u64, cairo_pie_compressed: Vec<u8>) -> Self {
         let pie = Self::decompress_cairo_pie(&cairo_pie_compressed);
-        Self {
-            reward,
-            num_of_steps: pie.execution_resources.n_steps as u64,
-            cairo_pie_compressed,
-            registry_address,
-        }
+        Self { reward, num_of_steps: pie.execution_resources.n_steps as u64, cairo_pie_compressed }
     }
 
     fn decompress_cairo_pie(cairo_pie_compressed: &[u8]) -> CairoPie {
@@ -96,7 +90,6 @@ impl Hash for JobData {
         self.reward.hash(state);
         self.num_of_steps.hash(state);
         self.cairo_pie_compressed.hash(state);
-        self.registry_address.hash(state);
     }
 }
 
@@ -111,30 +104,6 @@ impl Display for Job {
         write!(f, "{}", hex::encode(hash!(self).to_be_bytes()))
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use proptest::prelude::*;
-
-//     proptest! {
-//         #![proptest_config(ProptestConfig::with_cases(100))]
-//         #[test]
-//         fn job_verify_signature(job in any::<Job>()) {
-//             assert!(job.verify_signature());
-//         }
-//     }
-
-//     proptest! {
-//         #![proptest_config(ProptestConfig::with_cases(100))]
-//         #[test]
-//         fn job_serialization(job in any::<Job>()) {
-//             let serialized_job = serde_json::to_string(&job).unwrap();
-//             let deserialized_job: Job = serde_json::from_str(&serialized_job).unwrap();
-//             assert_eq!(job, deserialized_job)
-//         }
-//     }
-// }
 
 mod chunk_felt_array {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};

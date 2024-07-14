@@ -13,6 +13,7 @@ use tempfile::NamedTempFile;
 
 #[derive(Debug)]
 pub struct JobTrace {
+    pub job_hash: u64,
     pub air_public_input: NamedTempFile, // Temporary file containing the public input
     pub air_private_input: NamedTempFile, // Temporary file containing the private input; memory and trace files must exist for this to be valid
     pub memory: NamedTempFile, // Temporary file containing memory data (required for air_private_input validity)

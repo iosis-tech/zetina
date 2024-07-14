@@ -10,8 +10,8 @@ use zetina_runner::{
 async fn run_single_job() {
     let runner_fixture = runner_fixture();
 
-    let runner_identity = SigningKey::from_random().verifying_key();
-    let runner = CairoRunner::new(runner_fixture.program_path, &runner_identity);
+    let runner =
+        CairoRunner::new(runner_fixture.program_path, SigningKey::from_random().verifying_key());
     let prover = StoneProver::new();
 
     runner
@@ -28,8 +28,8 @@ async fn run_multiple_job() {
     let runner_fixture1 = runner_fixture();
     let runner_fixture2 = runner_fixture();
 
-    let runner_identity = SigningKey::from_random().verifying_key();
-    let runner = CairoRunner::new(runner_fixture1.program_path, &runner_identity);
+    let runner =
+        CairoRunner::new(runner_fixture1.program_path, SigningKey::from_random().verifying_key());
     let prover = StoneProver::new();
     let mut futures = FuturesUnordered::new();
 

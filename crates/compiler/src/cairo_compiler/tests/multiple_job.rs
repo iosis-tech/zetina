@@ -11,7 +11,7 @@ async fn run_multiple_jobs() {
     let fixture2 = fixture();
 
     let identity = SigningKey::from_random();
-    let compiler = CairoCompiler::new(&identity, FieldElement::ZERO);
+    let compiler = CairoCompiler::new(&identity);
     let mut futures = FuturesUnordered::new();
 
     let job1 = compiler.run(fixture1.program_path, fixture1.program_input_path).unwrap();
@@ -31,7 +31,7 @@ async fn abort_multiple_jobs() {
     let fixture2 = fixture();
 
     let identity = SigningKey::from_random();
-    let compiler = CairoCompiler::new(&identity, FieldElement::ZERO);
+    let compiler = CairoCompiler::new(&identity);
     let mut futures = FuturesUnordered::new();
 
     let job1 = runner.run(fixture1.program_path, fixture1.program_input_path).unwrap();
