@@ -142,7 +142,7 @@ impl Executor {
                                     _ => {}
                                 }
                             };
-                            if flag == false {
+                            if !flag {
                                 let serialized_job = serde_json::to_string(&job)?;
                                 picked_job_topic_tx.send(serialized_job.into()).await?;
                                 info!("Sent picked job event: {}", hash!(&job));
