@@ -39,7 +39,7 @@ metadata:
   namespace: zetina
   annotations:
     kube-vip.io/loadbalancerIPs: "0.0.0.0"
-    kube-vip.io/hwaddr: "00:00:6C:32:98:84"
+    kube-vip.io/hwaddr: "00:00:6C:32:98:85"
     kube-vip.io/loadbalancerHostname: "zetina-executor-3"
 spec:
   ports:

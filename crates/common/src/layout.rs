@@ -5,4 +5,5 @@ use strum::IntoStaticStr;
 pub enum Layout {
     RecursiveWithPoseidon,
     Starknet,
+    StarknetWithKeccak,
 }

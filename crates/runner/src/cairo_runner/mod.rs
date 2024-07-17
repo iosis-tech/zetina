@@ -37,7 +37,7 @@ impl RunnerController for CairoRunner {
             Box<dyn Future<Output = Result<JobTrace, RunnerControllerError>> + Send + '_>,
         > = Box::pin(async move {
             let job_hash = hash!(job);
-            let layout: &str = Layout::Starknet.into();
+            let layout: &str = Layout::StarknetWithKeccak.into();
 
             let mut cairo_pie = NamedTempFile::new()?;
             cairo_pie.write_all(&job.job_data.cairo_pie_compressed)?;

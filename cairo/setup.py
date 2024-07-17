@@ -15,5 +15,6 @@ setuptools.setup(
         "lang.compiler": ["cairo.ebnf", "lib/*.cairo"],
         "bootloader": ["*.cairo", "*/*.cairo"],
         "bootloader.starknet": ["*.cairo", "*/*.cairo"],
+        "bootloader.starknet_with_keccak": ["*.cairo", "*/*.cairo"],
     }
 )

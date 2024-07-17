@@ -77,5 +77,8 @@ RUN pip install -r requirements.txt && \
 # Copy the current directory content into the container
 COPY . .
 
+RUN cargo update -p rustls@0.23.11 --precise 0.23.10
+RUN cargo update -p rustls-webpki@0.102.5 --precise 0.102.4
+
 # Build
 RUN cargo build --release

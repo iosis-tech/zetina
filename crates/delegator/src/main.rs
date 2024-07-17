@@ -4,8 +4,7 @@ pub mod swarm;
 
 use api::ServerState;
 use axum::{
-    routing::{get, post},
-    Router,
+    extract::DefaultBodyLimit, routing::{get, post}, Router
 };
 use clap::Parser;
 use delegator::Delegator;
@@ -90,6 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // requests don't hang forever.
                 TimeoutLayer::new(Duration::from_secs(10)),
                 CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any),
+                DefaultBodyLimit::disable()
             ))
             .with_state(ServerState {
                 signing_key: node_account.get_signing_key().to_owned(),
