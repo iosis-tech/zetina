@@ -13,8 +13,6 @@
 
 </div>
 
-## Overview
-
 The Zetina is a shared peer-to-peer network of Zero-Knowledge Provers. This network allows any party to join and utilize its services, operating with two main user roles:
 
 1. **Delegators**: Users who present jobs to be executed on the network.
