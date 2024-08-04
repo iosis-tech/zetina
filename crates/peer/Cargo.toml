@@ -13,7 +13,10 @@ version.workspace = true
 [dependencies]
 async-stream.workspace = true
 futures.workspace = true
+thiserror.workspace = true
 libp2p.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 starknet.workspace = true
 tokio-util.workspace = true
 tokio.workspace = true

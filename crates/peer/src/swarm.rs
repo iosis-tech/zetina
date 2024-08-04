@@ -1,21 +1,19 @@
 use async_stream::stream;
 use futures::stream::Stream;
 use libp2p::futures::StreamExt;
-use libp2p::gossipsub::{self, IdentTopic};
+use libp2p::gossipsub::{self, IdentTopic, TopicHash};
 use libp2p::identity::Keypair;
-use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
-use libp2p::{mdns, noise, tcp, yamux, Swarm, SwarmBuilder};
-use std::error::Error;
+use libp2p::swarm::{DialError, NetworkBehaviour, SwarmEvent};
+use libp2p::{noise, tcp, yamux, Multiaddr, Swarm, SwarmBuilder};
+use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::time::Duration;
-use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 #[derive(NetworkBehaviour)]
-struct PeerBehaviour {
+pub struct PeerBehaviour {
     gossipsub: gossipsub::Behaviour,
-    mdns: mdns::tokio::Behaviour,
 }
 
 pub struct SwarmRunner {
@@ -23,17 +21,35 @@ pub struct SwarmRunner {
     cancellation_token: CancellationToken,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Topic {
+    Networking,
+}
+
+impl Topic {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Topic::Networking => "networking",
+        }
+    }
+}
+
+impl From<Topic> for TopicHash {
+    fn from(value: Topic) -> Self {
+        IdentTopic::from(value).into()
+    }
+}
+
+impl From<Topic> for IdentTopic {
+    fn from(value: Topic) -> Self {
+        IdentTopic::new(value.as_str())
+    }
+}
+
 impl SwarmRunner {
-    pub fn new(
-        p2p_local_keypair: &Keypair,
-        subscribe_topics: &[IdentTopic],
-    ) -> Result<Self, Box<dyn Error>> {
-        let mdns = mdns::tokio::Behaviour::new(
-            mdns::Config::default(),
-            p2p_local_keypair.public().to_peer_id(),
-        )?;
+    pub fn new(p2p_local_keypair: &Keypair) -> Result<Self, Box<dyn std::error::Error>> {
         let gossipsub = Self::init_gossip(p2p_local_keypair)?;
-        let behaviour = PeerBehaviour { gossipsub, mdns };
+        let behaviour = PeerBehaviour { gossipsub };
         let local_keypair = p2p_local_keypair.clone();
         let mut swarm = SwarmBuilder::with_existing_identity(local_keypair)
             .with_tokio()
@@ -43,9 +59,7 @@ impl SwarmRunner {
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
 
-        for topic in subscribe_topics {
-            swarm.behaviour_mut().gossipsub.subscribe(topic)?;
-        }
+        swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Networking.as_str()))?;
 
         swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
@@ -53,7 +67,9 @@ impl SwarmRunner {
         Ok(SwarmRunner { swarm, cancellation_token: CancellationToken::new() })
     }
 
-    fn init_gossip(p2p_local_keypair: &Keypair) -> Result<gossipsub::Behaviour, Box<dyn Error>> {
+    fn init_gossip(
+        p2p_local_keypair: &Keypair,
+    ) -> Result<gossipsub::Behaviour, Box<dyn std::error::Error>> {
         let message_authenticity =
             gossipsub::MessageAuthenticity::Signed(p2p_local_keypair.clone());
 
@@ -66,46 +82,52 @@ impl SwarmRunner {
         Ok(gossipsub::Behaviour::new(message_authenticity, config)?)
     }
 
-    pub fn run(
-        &mut self,
-        send_topic: IdentTopic,
-        mut send_topic_rx: mpsc::Receiver<Vec<u8>>,
-    ) -> Pin<Box<impl Stream<Item = gossipsub::Event> + '_>> {
+    pub fn run(&mut self) -> Pin<Box<impl Stream<Item = PeerBehaviourEvent> + '_>> {
         let stream = stream! {
             loop {
                 tokio::select! {
-                    Some(data) = send_topic_rx.recv() => {
-                        debug!("Publishing to topic: {:?}", send_topic);
-                        if let Err(e) = self.swarm
-                            .behaviour_mut().gossipsub
-                            .publish(send_topic.clone(), data) {
-                            error!("Publish error: {e:?}");
-                        }
-                    },
                     event = self.swarm.select_next_some() => match event {
-                        SwarmEvent::Behaviour(PeerBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                            for (peer_id, _multiaddr) in list {
-                                debug!("mDNS discovered a new peer: {peer_id}");
-                                self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-                            }
-                        },
-                        SwarmEvent::Behaviour(PeerBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                            for (peer_id, _multiaddr) in list {
-                                debug!("mDNS discover peer has expired: {peer_id}");
-                                self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                            }
-                        },
                         SwarmEvent::Behaviour(PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                             propagation_source,
                             message_id,
                             message,
                         })) => {
-                            yield gossipsub::Event::Message { propagation_source, message_id, message };
+                            if message.topic == Topic::Networking.into() {
+                                match serde_json::from_slice(&message.data) {
+                                    Ok(msg) => match msg {
+                                        NetworkingMessage::Multiaddr(addr) => {
+                                            if let Err(error) = self.swarm.dial(addr) {
+                                                error!{"{:?}", error};
+                                            }
+                                        }
+                                    }
+                                    Err(error) => {
+                                        error!{"{:?}", error};
+                                    }
+                                }
+
+                            }
+
+                            yield PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                                propagation_source,
+                                message_id,
+                                message,
+                            });
                         },
-                        SwarmEvent::NewListenAddr { address, .. } => {
-                            debug!("Local node is listening on {address}");
+                        SwarmEvent::ConnectionEstablished { peer_id, connection_id, num_established, .. } => {
+                            info!{"ConnectionEstablished: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
+                            self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                         }
-                        _ => {}
+                        SwarmEvent::ConnectionClosed { peer_id, connection_id, num_established, .. } => {
+                            info!{"ConnectionClosed: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
+                            self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                        }
+                        SwarmEvent::Behaviour (event) => {
+                            yield event
+                        }
+                        event => {
+                            debug!("{:?}", event);
+                        }
                     },
                     _ = self.cancellation_token.cancelled() => {
                         break
@@ -121,4 +143,20 @@ impl Drop for SwarmRunner {
     fn drop(&mut self) {
         self.cancellation_token.cancel();
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum NetworkingMessage {
+    Multiaddr(Multiaddr),
+}
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("serde")]
+    Serde(#[from] serde_json::Error),
+
+    #[error("dial")]
+    Dial(#[from] DialError),
 }
