@@ -17,14 +17,11 @@ services:
       dockerfile: delegator.dockerfile
     image: zetina-delegator
     hostname: zetina-delegator
-    depends_on:
-      - zetina-runtime
-      - zetina-executor
     deploy:
       resources:
         limits:
-          cpus: '10'
-          memory: '10G'
+          cpus: '1'
+          memory: '1G'
     environment:
       - RUST_LOG=info
     networks:
