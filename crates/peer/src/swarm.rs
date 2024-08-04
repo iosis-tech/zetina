@@ -60,7 +60,6 @@ impl SwarmRunner {
             .build();
 
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Networking.as_str()))?;
-
         swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
 
@@ -82,7 +81,7 @@ impl SwarmRunner {
         Ok(gossipsub::Behaviour::new(message_authenticity, config)?)
     }
 
-    pub fn run(&mut self) -> Pin<Box<impl Stream<Item = PeerBehaviourEvent> + '_>> {
+    pub fn run(&mut self) -> Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + '_>> {
         let stream = stream! {
             loop {
                 tokio::select! {
@@ -93,19 +92,16 @@ impl SwarmRunner {
                             message,
                         })) => {
                             if message.topic == Topic::Networking.into() {
-                                match serde_json::from_slice(&message.data) {
-                                    Ok(msg) => match msg {
-                                        NetworkingMessage::Multiaddr(addr) => {
-                                            if let Err(error) = self.swarm.dial(addr) {
-                                                error!{"{:?}", error};
-                                            }
+                                match serde_json::from_slice::<NetworkingMessage>(&message.data) {
+                                    Ok(NetworkingMessage::Multiaddr(addr)) => {
+                                        if let Err(error) = self.swarm.dial(addr) {
+                                            error!{"Dial error: {:?}", error};
                                         }
                                     }
                                     Err(error) => {
-                                        error!{"{:?}", error};
+                                        error!{"Deserialization error: {:?}", error};
                                     }
                                 }
-
                             }
 
                             yield PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message {
@@ -113,24 +109,24 @@ impl SwarmRunner {
                                 message_id,
                                 message,
                             });
-                        },
+                        }
                         SwarmEvent::ConnectionEstablished { peer_id, connection_id, num_established, .. } => {
-                            info!{"ConnectionEstablished: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
+                            info!{"Connection established: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
                             self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                         }
                         SwarmEvent::ConnectionClosed { peer_id, connection_id, num_established, .. } => {
-                            info!{"ConnectionClosed: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
+                            info!{"Connection closed: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
                             self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                         }
-                        SwarmEvent::Behaviour (event) => {
-                            yield event
+                        SwarmEvent::Behaviour(event) => {
+                            yield event;
                         }
                         event => {
-                            debug!("{:?}", event);
+                            debug!("Unhandled event: {:?}", event);
                         }
                     },
                     _ = self.cancellation_token.cancelled() => {
-                        break
+                        break;
                     }
                 }
             }
@@ -154,9 +150,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("serde")]
+    #[error("Serde error")]
     Serde(#[from] serde_json::Error),
 
-    #[error("dial")]
+    #[error("Dial error")]
     Dial(#[from] DialError),
 }
