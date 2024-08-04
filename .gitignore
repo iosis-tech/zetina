@@ -24,8 +24,6 @@ Cargo.lock
 Scarb.lock
 .snfoundry_cache/
 
-stone-prover
-
 bootloader*.json
 
 # Python
