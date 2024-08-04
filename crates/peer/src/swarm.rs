@@ -8,6 +8,7 @@ use libp2p::{noise, tcp, yamux, Multiaddr, Swarm, SwarmBuilder};
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::time::Duration;
+use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
 
@@ -18,6 +19,7 @@ pub struct PeerBehaviour {
 
 pub struct SwarmRunner {
     pub swarm: Swarm<PeerBehaviour>,
+    pub p2p_multiaddr: Multiaddr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,12 +47,17 @@ impl From<Topic> for IdentTopic {
     }
 }
 
+pub struct GossipsubMessage {
+    topic: IdentTopic,
+    data: Vec<u8>,
+}
+
 impl SwarmRunner {
-    pub fn new(p2p_local_keypair: &Keypair) -> Result<Self, Box<dyn std::error::Error>> {
-        let gossipsub = Self::init_gossip(p2p_local_keypair)?;
-        let behaviour = PeerBehaviour { gossipsub };
-        let local_keypair = p2p_local_keypair.clone();
-        let mut swarm = SwarmBuilder::with_existing_identity(local_keypair)
+    pub fn new(
+        p2p_keypair: Keypair,
+        p2p_multiaddr: Multiaddr,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut swarm = SwarmBuilder::with_existing_identity(p2p_keypair)
             .with_tokio()
             .with_tcp(
                 tcp::Config::default().port_reuse(true),
@@ -58,7 +65,9 @@ impl SwarmRunner {
                 yamux::Config::default,
             )?
             .with_quic()
-            .with_behaviour(|_| behaviour)?
+            .with_behaviour(|p2p_keypair| PeerBehaviour {
+                gossipsub: Self::init_gossip(p2p_keypair).unwrap(),
+            })?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
 
@@ -66,7 +75,7 @@ impl SwarmRunner {
         // swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
 
-        Ok(SwarmRunner { swarm })
+        Ok(SwarmRunner { swarm, p2p_multiaddr })
     }
 
     fn init_gossip(
@@ -84,17 +93,42 @@ impl SwarmRunner {
         Ok(gossipsub::Behaviour::new(message_authenticity, config)?)
     }
 
-    pub fn run(mut self) -> Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + Send>> {
+    pub fn run(
+        mut self,
+        mut gossipsub_message: mpsc::Receiver<GossipsubMessage>,
+    ) -> Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + Send>> {
         let stream = stream! {
             loop {
                 tokio::select! {
+                    Some(message) = gossipsub_message.recv() => {
+                        if let Err(e) = self.swarm
+                            .behaviour_mut()
+                            .gossipsub
+                            .publish(message.topic, message.data)
+                        {
+                            error!("Publish error: {e:?}");
+                        }
+                    },
                     event = self.swarm.select_next_some() => match event {
+                        SwarmEvent::Behaviour(PeerBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
+                            peer_id, topic
+                        })) => {
+                            if topic == Topic::Networking.into() {
+                                self.swarm.behaviour_mut().gossipsub.publish(
+                                    Topic::Networking,
+                                    serde_json::to_vec(&NetworkingMessage::Multiaddr(self.p2p_multiaddr.to_owned())).unwrap()
+                                ).unwrap();
+                            }
+
+                            yield PeerBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
+                                peer_id, topic
+                            });
+                        },
                         SwarmEvent::Behaviour(PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                             propagation_source,
                             message_id,
                             message,
                         })) => {
-                            debug!("Gossipsub event: {:?}, {:?}, {:?}", propagation_source, message_id, message);
                             if message.topic == Topic::Networking.into() {
                                 match serde_json::from_slice::<NetworkingMessage>(&message.data) {
                                     Ok(NetworkingMessage::Multiaddr(addr)) => {
@@ -123,7 +157,6 @@ impl SwarmRunner {
                             self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                         }
                         SwarmEvent::Behaviour(event) => {
-                            debug!("Behaviour event: {:?}", event);
                             yield event;
                         }
                         event => {

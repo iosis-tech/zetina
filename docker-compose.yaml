@@ -29,7 +29,7 @@ services:
     networks:
       zetina-network:
         ipv4_address: 172.16.238.3
-    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f32 -d /ip4/172.16.238.2/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV"]
+    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f32 -a /ip4/172.16.238.3/tcp/5679/p2p/QmUEi69CXN8SXEYhkzoqJzQ6aEHTKqJzewqirBiT8FKmBu -d /ip4/172.16.238.2/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV"]
 
   zetina-delegator-2:
     build:
@@ -48,7 +48,7 @@ services:
     networks:
       zetina-network:
         ipv4_address: 172.16.238.2
-    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f31 -d /ip4/172.16.238.4/tcp/5679/p2p/QmYaed2psXu4UMTXqrrRUE7PaYnwGFkvGvKvTUBCQSry4S"]
+    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f31 -a /ip4/172.16.238.2/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV -d /ip4/172.16.238.4/tcp/5679/p2p/QmYaed2psXu4UMTXqrrRUE7PaYnwGFkvGvKvTUBCQSry4S"]
 
   zetina-delegator-3:
     build:
@@ -65,7 +65,7 @@ services:
     networks:
       zetina-network:
         ipv4_address: 172.16.238.4
-    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f33"]
+    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f33 -a /ip4/172.16.238.4/tcp/5679/p2p/QmYaed2psXu4UMTXqrrRUE7PaYnwGFkvGvKvTUBCQSry4S"]
 
   # zetina-executor:
   #   build:
