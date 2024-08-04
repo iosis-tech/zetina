@@ -1,0 +1,3 @@
+[submodule "stone-prover"]
+	path = stone-prover
+	url = https://github.com/iosis-tech/stone-prover.git

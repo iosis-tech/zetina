@@ -1,4 +1,4 @@
-# Use the official Rust image from the Docker Hub
+# Stage 1: Use the official Rust image from the Docker Hub
 FROM rust:latest
 
 # Set the working directory inside the container
