@@ -17,7 +17,7 @@ pub struct PeerBehaviour {
 }
 
 pub struct SwarmRunner {
-    swarm: Swarm<PeerBehaviour>,
+    pub swarm: Swarm<PeerBehaviour>,
     cancellation_token: CancellationToken,
 }
 

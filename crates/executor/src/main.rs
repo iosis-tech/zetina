@@ -1,23 +1,12 @@
-pub mod executor;
-pub mod swarm;
-
 use axum::Router;
 use clap::Parser;
-use executor::Executor;
-use libp2p::gossipsub;
+use libp2p::Multiaddr;
 use std::time::Duration;
-use swarm::SwarmRunner;
-use tokio::{net::TcpListener, sync::mpsc};
+use tokio::net::TcpListener;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing_subscriber::EnvFilter;
-use zetina_common::{
-    graceful_shutdown::shutdown_signal,
-    network::Network,
-    node_account::NodeAccount,
-    topic::{gossipsub_ident_topic, Topic},
-};
-use zetina_prover::stone_prover::StoneProver;
-use zetina_runner::cairo_runner::CairoRunner;
+use zetina_common::graceful_shutdown::shutdown_signal;
+use zetina_peer::swarm::SwarmRunner;
 
 #[derive(Parser)]
 struct Cli {
@@ -40,39 +29,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"),
     )
     .join("../../");
-    let bootloader_program_path = ws_root.join("target/bootloader.json");
+    let _bootloader_program_path = ws_root.join("target/bootloader.json");
 
     // TODO: common setup in node initiate binary
-    let network = Network::Sepolia;
     let private_key = hex::decode(cli.private_key)?;
+    let secret_key = libp2p::identity::ecdsa::SecretKey::try_from_bytes(private_key.as_slice())?;
+    let p2p_keypair =
+        libp2p::identity::Keypair::from(libp2p::identity::ecdsa::Keypair::from(secret_key));
 
-    let node_account = NodeAccount::new(private_key);
+    let mut swarm_runner = SwarmRunner::new(&p2p_keypair)?;
 
-    // Generate topic
-    let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
-    let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
-    let finished_job_topic = gossipsub_ident_topic(network, Topic::FinishedJob);
+    cli.dial_addresses
+        .into_iter()
+        .try_for_each(|addr| swarm_runner.swarm.dial(addr.parse::<Multiaddr>().unwrap()))
+        .unwrap();
 
-    let (swarm_events_tx, swarm_events_rx) = mpsc::channel::<gossipsub::Event>(100);
-    let (picked_job_topic_tx, picked_job_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
-    let (finished_job_topic_tx, finished_job_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
-
-    SwarmRunner::new(
-        cli.dial_addresses,
-        node_account.get_keypair(),
-        vec![new_job_topic, picked_job_topic.to_owned(), finished_job_topic.to_owned()],
-        vec![
-            (picked_job_topic.to_owned(), picked_job_topic_rx),
-            (finished_job_topic, finished_job_topic_rx),
-        ],
-        swarm_events_tx,
-    )?;
-
-    let verifying_key = node_account.get_verifying_key();
-    let runner = CairoRunner::new(bootloader_program_path, verifying_key);
-    let prover = StoneProver::new();
-
-    Executor::new(swarm_events_rx, finished_job_topic_tx, picked_job_topic_tx, runner, prover);
+    let _swarm_events = swarm_runner.run();
 
     // Create a `TcpListener` using tokio.
     let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();
