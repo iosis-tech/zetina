@@ -8,8 +8,8 @@ use libp2p::{noise, tcp, yamux, Multiaddr, Swarm, SwarmBuilder};
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::time::Duration;
-use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
+use zetina_common::graceful_shutdown::shutdown_signal;
 
 #[derive(NetworkBehaviour)]
 pub struct PeerBehaviour {
@@ -18,7 +18,6 @@ pub struct PeerBehaviour {
 
 pub struct SwarmRunner {
     pub swarm: Swarm<PeerBehaviour>,
-    cancellation_token: CancellationToken,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,17 +52,21 @@ impl SwarmRunner {
         let local_keypair = p2p_local_keypair.clone();
         let mut swarm = SwarmBuilder::with_existing_identity(local_keypair)
             .with_tokio()
-            .with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)?
+            .with_tcp(
+                tcp::Config::default().port_reuse(true),
+                noise::Config::new,
+                yamux::Config::default,
+            )?
             .with_quic()
             .with_behaviour(|_| behaviour)?
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
 
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Networking.as_str()))?;
-        swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
+        // swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
 
-        Ok(SwarmRunner { swarm, cancellation_token: CancellationToken::new() })
+        Ok(SwarmRunner { swarm })
     }
 
     fn init_gossip(
@@ -81,7 +84,7 @@ impl SwarmRunner {
         Ok(gossipsub::Behaviour::new(message_authenticity, config)?)
     }
 
-    pub fn run(&mut self) -> Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + '_>> {
+    pub fn run(mut self) -> Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + Send>> {
         let stream = stream! {
             loop {
                 tokio::select! {
@@ -91,6 +94,7 @@ impl SwarmRunner {
                             message_id,
                             message,
                         })) => {
+                            debug!("Gossipsub event: {:?}, {:?}, {:?}", propagation_source, message_id, message);
                             if message.topic == Topic::Networking.into() {
                                 match serde_json::from_slice::<NetworkingMessage>(&message.data) {
                                     Ok(NetworkingMessage::Multiaddr(addr)) => {
@@ -119,25 +123,21 @@ impl SwarmRunner {
                             self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                         }
                         SwarmEvent::Behaviour(event) => {
+                            debug!("Behaviour event: {:?}", event);
                             yield event;
                         }
                         event => {
                             debug!("Unhandled event: {:?}", event);
                         }
                     },
-                    _ = self.cancellation_token.cancelled() => {
-                        break;
+                    _ = shutdown_signal() => {
+                        break
                     }
+                    else => break
                 }
             }
         };
         Box::pin(stream)
-    }
-}
-
-impl Drop for SwarmRunner {
-    fn drop(&mut self) {
-        self.cancellation_token.cancel();
     }
 }
 

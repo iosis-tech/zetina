@@ -1,9 +1,11 @@
 use axum::Router;
 use clap::Parser;
 use libp2p::Multiaddr;
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 use tokio::net::TcpListener;
+use tokio_stream::StreamExt;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
+use tracing::debug;
 use tracing_subscriber::EnvFilter;
 use zetina_common::graceful_shutdown::shutdown_signal;
 use zetina_peer::swarm::SwarmRunner;
@@ -35,10 +37,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     cli.dial_addresses
         .into_iter()
-        .try_for_each(|addr| swarm_runner.swarm.dial(addr.parse::<Multiaddr>().unwrap()))
+        .try_for_each(|addr| swarm_runner.swarm.dial(Multiaddr::from_str(&addr).unwrap()))
         .unwrap();
 
-    let _swarm_events = swarm_runner.run();
+    let mut swarm_events = swarm_runner.run();
+
+    tokio::spawn(async move {
+        while let Some(_event) = swarm_events.next().await {
+            debug!("");
+        }
+    });
 
     // Create a `TcpListener` using tokio.
     let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();
