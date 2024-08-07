@@ -1,13 +1,16 @@
+pub mod delegator;
+pub mod job_bid_queue;
+
 use axum::Router;
 use clap::Parser;
+use delegator::Delegator;
 use libp2p::Multiaddr;
+use starknet::{core::types::FieldElement, signers::SigningKey};
 use std::{str::FromStr, time::Duration};
 use tokio::{net::TcpListener, sync::mpsc};
-use tokio_stream::StreamExt;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
-use tracing::debug;
 use tracing_subscriber::EnvFilter;
-use zetina_common::graceful_shutdown::shutdown_signal;
+use zetina_common::{graceful_shutdown::shutdown_signal, job::JobData};
 use zetina_peer::swarm::{GossipsubMessage, SwarmRunner};
 
 #[derive(Parser)]
@@ -36,6 +39,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let p2p_keypair =
         libp2p::identity::Keypair::from(libp2p::identity::ecdsa::Keypair::from(secret_key));
 
+    let signing_key = SigningKey::from_secret_scalar(
+        FieldElement::from_byte_slice_be(private_key.as_slice()).unwrap(),
+    );
+
     let mut swarm_runner =
         SwarmRunner::new(p2p_keypair, Multiaddr::from_str(&cli.address).unwrap())?;
 
@@ -44,14 +51,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .try_for_each(|addr| swarm_runner.swarm.dial(Multiaddr::from_str(&addr).unwrap()))
         .unwrap();
 
-    let (_gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
-    let mut swarm_events = swarm_runner.run(gossipsub_rx);
+    let (gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
+    let (delegate_tx, delegate_rx) = mpsc::channel::<JobData>(100);
+    let swarm_events = swarm_runner.run(gossipsub_rx);
 
-    tokio::spawn(async move {
-        while let Some(_event) = swarm_events.next().await {
-            debug!("");
-        }
-    });
+    Delegator::new(swarm_events, gossipsub_tx, delegate_rx, signing_key);
 
     // Create a `TcpListener` using tokio.
     let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();

@@ -1,20 +1,18 @@
+pub mod executor;
+
 use axum::Router;
 use clap::Parser;
-use libp2p::{
-    gossipsub::{self},
-    Multiaddr,
-};
-use std::hash::{DefaultHasher, Hash, Hasher};
+use executor::Executor;
+use libp2p::Multiaddr;
+use starknet::{core::types::FieldElement, signers::SigningKey};
 use std::{str::FromStr, time::Duration};
 use tokio::{net::TcpListener, sync::mpsc};
-use tokio_stream::StreamExt;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
-use tracing::error;
 use tracing_subscriber::EnvFilter;
-use zetina_common::{graceful_shutdown::shutdown_signal, hash, job::JobBid};
-use zetina_peer::swarm::{
-    DelegationMessage, GossipsubMessage, MarketMessage, PeerBehaviourEvent, SwarmRunner, Topic,
-};
+use zetina_common::graceful_shutdown::shutdown_signal;
+use zetina_peer::swarm::{GossipsubMessage, SwarmRunner};
+use zetina_prover::stone_prover::StoneProver;
+use zetina_runner::cairo_runner::CairoRunner;
 
 #[derive(Parser)]
 struct Cli {
@@ -42,6 +40,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let p2p_keypair =
         libp2p::identity::Keypair::from(libp2p::identity::ecdsa::Keypair::from(secret_key));
 
+    let identity = p2p_keypair.public().to_peer_id();
+
+    let signing_key = SigningKey::from_secret_scalar(
+        FieldElement::from_byte_slice_be(private_key.as_slice()).unwrap(),
+    );
+
+    let ws_root = std::path::PathBuf::from(
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"),
+    )
+    .join("../../");
+    let bootloader_program_path = ws_root.join("target/bootloader.json");
+
     let mut swarm_runner =
         SwarmRunner::new(p2p_keypair, Multiaddr::from_str(&cli.address).unwrap())?;
 
@@ -51,49 +61,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     let (gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
-    let mut swarm_events = swarm_runner.run(gossipsub_rx);
+    let swarm_events = swarm_runner.run(gossipsub_rx);
 
-    tokio::spawn(async move {
-        while let Some(event) = swarm_events.next().await {
-            match event {
-                PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message { message, .. }) => {
-                    if message.topic == Topic::Market.into() {
-                        match serde_json::from_slice::<MarketMessage>(&message.data) {
-                            Ok(MarketMessage::Job(job)) => {
-                                gossipsub_tx
-                                    .send(GossipsubMessage {
-                                        topic: Topic::Market.into(),
-                                        data: serde_json::to_vec(&MarketMessage::JobBid(JobBid {
-                                            job_hash: hash!(job),
-                                            price: 1000,
-                                        }))
-                                        .unwrap(),
-                                    })
-                                    .await
-                                    .unwrap();
-                            }
-                            Err(error) => {
-                                error! {"Deserialization error: {:?}", error};
-                            }
-                            _ => {}
-                        }
-                    }
-                    if message.topic == Topic::Delegation.into() {
-                        match serde_json::from_slice::<DelegationMessage>(&message.data) {
-                            Ok(DelegationMessage::Delegate(_job)) => {
-                                //TODO run and prove
-                            }
-                            Err(error) => {
-                                error! {"Deserialization error: {:?}", error};
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    });
+    let runner = CairoRunner::new(bootloader_program_path, signing_key.verifying_key());
+    let prover = StoneProver::new();
+
+    Executor::new(identity, swarm_events, gossipsub_tx, runner, prover);
 
     // Create a `TcpListener` using tokio.
     let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();

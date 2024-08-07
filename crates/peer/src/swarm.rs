@@ -11,7 +11,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
-use zetina_common::job::{Job, JobBid};
+use zetina_common::job::{Job, JobBid, JobDelegation};
 use zetina_common::job_witness::JobWitness;
 
 #[derive(NetworkBehaviour)]
@@ -71,7 +71,7 @@ pub enum MarketMessage {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum DelegationMessage {
-    Delegate(Job),
+    Delegate(JobDelegation),
     Finished(JobWitness),
 }
 
@@ -96,6 +96,7 @@ impl SwarmRunner {
 
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Networking.as_str()))?;
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Market.as_str()))?;
+        swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Delegation.as_str()))?;
         // swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
 
