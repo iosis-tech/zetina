@@ -1,4 +1,3 @@
-use rand::{thread_rng, Rng};
 use zetina_common::job::{Job, JobData};
 
 use starknet::signers::SigningKey;
@@ -10,7 +9,6 @@ pub struct TestFixture {
 }
 
 pub fn fixture() -> TestFixture {
-    let mut rng = thread_rng();
     let ws_root =
         PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"))
             .join("../../");
@@ -19,7 +17,7 @@ pub fn fixture() -> TestFixture {
 
     TestFixture {
         job: Job::try_from_job_data(
-            JobData::new(rng.gen(), fs::read(cairo_pie_path).unwrap()),
+            JobData::new(fs::read(cairo_pie_path).unwrap()),
             &SigningKey::from_random(),
         ),
         program_path,

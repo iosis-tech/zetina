@@ -11,6 +11,8 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
+use zetina_common::job::{Job, JobBid};
+use zetina_common::job_witness::JobWitness;
 
 #[derive(NetworkBehaviour)]
 pub struct PeerBehaviour {
@@ -25,12 +27,16 @@ pub struct SwarmRunner {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Topic {
     Networking,
+    Market,
+    Delegation,
 }
 
 impl Topic {
     pub fn as_str(&self) -> &'static str {
         match self {
             Topic::Networking => "networking",
+            Topic::Market => "market",
+            Topic::Delegation => "delegation",
         }
     }
 }
@@ -48,8 +54,25 @@ impl From<Topic> for IdentTopic {
 }
 
 pub struct GossipsubMessage {
-    topic: IdentTopic,
-    data: Vec<u8>,
+    pub topic: IdentTopic,
+    pub data: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum NetworkingMessage {
+    Multiaddr(Multiaddr),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum MarketMessage {
+    Job(Job),
+    JobBid(JobBid),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum DelegationMessage {
+    Delegate(Job),
+    Finished(JobWitness),
 }
 
 impl SwarmRunner {
@@ -72,6 +95,7 @@ impl SwarmRunner {
             .build();
 
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Networking.as_str()))?;
+        swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Market.as_str()))?;
         // swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
 
@@ -101,6 +125,7 @@ impl SwarmRunner {
             loop {
                 tokio::select! {
                     Some(message) = gossipsub_message.recv() => {
+                        debug!{"Sending gossipsub_message: topic {}, data {:?}", message.topic, message.data};
                         if let Err(e) = self.swarm
                             .behaviour_mut()
                             .gossipsub
@@ -172,11 +197,6 @@ impl SwarmRunner {
         };
         Box::pin(stream)
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum NetworkingMessage {
-    Multiaddr(Multiaddr),
 }
 
 use thiserror::Error;
