@@ -1,16 +1,29 @@
+pub mod api;
 pub mod delegator;
 pub mod job_bid_queue;
 
-use axum::Router;
+use api::ServerState;
+use axum::{
+    extract::DefaultBodyLimit,
+    routing::{get, post},
+    Router,
+};
 use clap::Parser;
 use delegator::Delegator;
 use libp2p::Multiaddr;
 use starknet::{core::types::FieldElement, signers::SigningKey};
 use std::{str::FromStr, time::Duration};
-use tokio::{net::TcpListener, sync::mpsc};
-use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
+use tokio::{
+    net::TcpListener,
+    sync::{broadcast, mpsc},
+};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    timeout::TimeoutLayer,
+    trace::TraceLayer,
+};
 use tracing_subscriber::EnvFilter;
-use zetina_common::{graceful_shutdown::shutdown_signal, job::JobData};
+use zetina_common::{graceful_shutdown::shutdown_signal, job::JobData, job_witness::JobWitness};
 use zetina_peer::swarm::{GossipsubMessage, SwarmRunner};
 
 #[derive(Parser)]
@@ -53,22 +66,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
     let (delegate_tx, delegate_rx) = mpsc::channel::<JobData>(100);
+    let (finished_tx, finished_rx) = broadcast::channel::<JobWitness>(100);
     let swarm_events = swarm_runner.run(gossipsub_rx);
 
-    Delegator::new(swarm_events, gossipsub_tx, delegate_rx, signing_key);
+    Delegator::new(swarm_events, gossipsub_tx, delegate_rx, finished_tx, signing_key);
 
     // Create a `TcpListener` using tokio.
-    let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
 
     // Run the server with graceful shutdown
     axum::serve(
         listener,
-        Router::new().layer((
-            TraceLayer::new_for_http(),
-            // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
-            // requests don't hang forever.
-            TimeoutLayer::new(Duration::from_secs(10)),
-        )),
+        Router::new()
+            .route("/delegate", post(api::deletage_handler))
+            .route("/job_events", get(api::job_events_handler))
+            .layer((
+                TraceLayer::new_for_http(),
+                // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
+                // requests don't hang forever.
+                TimeoutLayer::new(Duration::from_secs(10)),
+                CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any),
+                DefaultBodyLimit::disable(),
+            ))
+            .with_state(ServerState { delegate_tx, finished_rx }),
     )
     .with_graceful_shutdown(shutdown_signal())
     .await?;

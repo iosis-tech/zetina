@@ -4,12 +4,13 @@ use libp2p::gossipsub;
 use starknet::signers::SigningKey;
 use std::pin::Pin;
 use thiserror::Error;
-use tokio::sync::mpsc::{self, Receiver};
+use tokio::sync::{broadcast, mpsc};
 use tokio::{sync::mpsc::Sender, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tracing::{error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
 use zetina_common::job::{Job, JobData, JobDelegation};
+use zetina_common::job_witness::JobWitness;
 use zetina_peer::swarm::{
     DelegationMessage, GossipsubMessage, MarketMessage, PeerBehaviourEvent, Topic,
 };
@@ -24,7 +25,8 @@ impl Delegator {
     pub fn new(
         mut swarm_events: Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + Send>>,
         gossipsub_tx: Sender<GossipsubMessage>,
-        mut delegate_rx: Receiver<JobData>,
+        mut delegate_rx: mpsc::Receiver<JobData>,
+        finished_tx: broadcast::Sender<JobWitness>,
         signing_key: SigningKey,
     ) -> Self {
         Self {
@@ -65,7 +67,7 @@ impl Delegator {
                                         match serde_json::from_slice::<DelegationMessage>(&message.data)? {
                                             DelegationMessage::Finished(job_witness) => {
                                                 info!("Received finished job: {}", job_witness.job_hash);
-                                                todo!()
+                                                finished_tx.send(job_witness)?;
                                             }
                                             _ => {}
                                         }
@@ -95,8 +97,11 @@ impl Drop for Delegator {
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("mpsc_send_error")]
-    MpscSendError(#[from] mpsc::error::SendError<GossipsubMessage>),
+    #[error("mpsc_send_error GossipsubMessage")]
+    MpscSendErrorGossipsubMessage(#[from] mpsc::error::SendError<GossipsubMessage>),
+
+    #[error("mpsc_send_error JobWitness")]
+    BreadcastSendErrorJobWitness(#[from] broadcast::error::SendError<JobWitness>),
 
     #[error("io")]
     Io(#[from] std::io::Error),

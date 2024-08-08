@@ -28,7 +28,7 @@ impl JobBidQueue {
     pub fn get_best(&self, job_hash: u64) -> Option<(Job, PeerId, u64)> {
         self.map.get(&job_hash).and_then(|(job, bids)| {
             bids.iter()
-                .max_by_key(|&(_, price)| price)
+                .min_by_key(|&(_, price)| price)
                 .map(|(peer_id, &price)| (job.clone(), *peer_id, price))
         })
     }
