@@ -38,4 +38,8 @@ impl JobBidQueue {
             map.insert(identity, job_bid.price);
         }
     }
+
+    pub fn remove_job(&mut self, job_hash: u64) -> Option<(Job, HashMap<PeerId, u64>)> {
+        self.map.remove(&job_hash)
+    }
 }

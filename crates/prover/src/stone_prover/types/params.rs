@@ -59,7 +59,7 @@ impl Default for Params {
             field: Field::PrimeField0,
             channel_hash: Hash::Poseidon3,
             commitment_hash: Hash::Keccak256Masked160Lsb,
-            n_verifier_friendly_commitment_layers: 1000,
+            n_verifier_friendly_commitment_layers: 0,
             pow_hash: Hash::Keccak256,
             statement: Statement::default(),
             stark: Stark::default(),

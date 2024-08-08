@@ -1,4 +1,4 @@
-use futures::executor::block_on;
+use crate::job_bid_queue::JobBidQueue;
 use futures::Stream;
 use libp2p::gossipsub;
 use starknet::signers::SigningKey;
@@ -14,8 +14,6 @@ use zetina_common::job_witness::JobWitness;
 use zetina_peer::swarm::{
     DelegationMessage, GossipsubMessage, MarketMessage, PeerBehaviourEvent, Topic,
 };
-
-use crate::job_bid_queue::JobBidQueue;
 
 pub struct Delegator {
     handle: Option<JoinHandle<Result<(), Error>>>,
@@ -50,6 +48,7 @@ impl Delegator {
                                             MarketMessage::JobBid(job_bid) => {
                                                 job_bid_queue.insert_bid(job_bid.to_owned(), propagation_source);
                                                 if let Some((job, identity, price)) = job_bid_queue.get_best(job_bid.job_hash) {
+                                                    job_bid_queue.remove_job(job_bid.job_hash);
                                                     gossipsub_tx.send(GossipsubMessage {
                                                         topic: Topic::Delegation.into(),
                                                         data: serde_json::to_vec(&DelegationMessage::Delegate(JobDelegation{
@@ -91,7 +90,11 @@ impl Delegator {
 impl Drop for Delegator {
     fn drop(&mut self) {
         let handle = self.handle.take();
-        block_on(async move { handle.unwrap().await.unwrap().unwrap() });
+        tokio::spawn(async move {
+            if let Some(handle) = handle {
+                handle.await.unwrap().unwrap();
+            }
+        });
     }
 }
 

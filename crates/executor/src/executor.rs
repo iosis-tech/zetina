@@ -1,4 +1,3 @@
-use futures::executor::block_on;
 use futures::{stream::FuturesUnordered, Stream};
 use libp2p::{gossipsub, PeerId};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -104,7 +103,11 @@ impl Executor {
 impl Drop for Executor {
     fn drop(&mut self) {
         let handle = self.handle.take();
-        block_on(async move { handle.unwrap().await.unwrap().unwrap() });
+        tokio::spawn(async move {
+            if let Some(handle) = handle {
+                handle.await.unwrap().unwrap();
+            }
+        });
     }
 }
 
