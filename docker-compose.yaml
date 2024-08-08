@@ -1,89 +1,100 @@
-services:
-  # zetina-stone-prover:
-  #   build:
-  #     context: stone-prover
-  #     dockerfile: Dockerfile
-  #   image: zetina-stone-prover
+version: '3.8'
 
-  # zetina-runtime:
-  #   build:
-  #     dockerfile: runtime.dockerfile
-  #   image: zetina-runtime
-  #   depends_on:
-  #     - zetina-stone-prover
+services:
+  zetina-stone-prover:
+    build:
+      context: stone-prover
+      dockerfile: Dockerfile
+    image: zetina-stone-prover
+
+  zetina-runtime:
+    build:
+      dockerfile: runtime.dockerfile
+    image: zetina-runtime
+    depends_on:
+      - zetina-stone-prover
+
+  zetina-delegator:
+    image: zetina-delegator
+    build:
+      dockerfile: delegator.dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+    environment:
+      - RUST_LOG=info
 
   zetina-delegator-1:
-    build:
-      dockerfile: delegator.dockerfile
+    extends:
+      service: zetina-delegator
     image: zetina-delegator-1
     hostname: zetina-delegator-1
-    depends_on:
-      -  zetina-delegator-2
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: '1G'
-    environment:
-      - RUST_LOG=info
-    networks:
-      zetina-network:
-        ipv4_address: 172.16.238.3
-    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f32 -a /ip4/172.16.238.3/tcp/5679/p2p/QmUEi69CXN8SXEYhkzoqJzQ6aEHTKqJzewqirBiT8FKmBu -d /ip4/172.16.238.2/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV"]
-
-  zetina-delegator-2:
-    build:
-      dockerfile: delegator.dockerfile
-    image: zetina-delegator-2
-    hostname: zetina-delegator-2
-    depends_on:
-      -  zetina-delegator-3
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: '1G'
-    environment:
-      - RUST_LOG=info
     networks:
       zetina-network:
         ipv4_address: 172.16.238.2
-    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f31 -a /ip4/172.16.238.2/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV -d /ip4/172.16.238.4/tcp/5679/p2p/QmYaed2psXu4UMTXqrrRUE7PaYnwGFkvGvKvTUBCQSry4S"]
+    command:
+      - "bash"
+      - "-ci"
+      - "cargo run --release --bin zetina-delegator -- -p 2 -a /ip4/172.16.238.2/tcp/5679/p2p/QmUEi69CXN8SXEYhkzoqJzQ6aEHTKqJzewqirBiT8FKmBu"
 
-  zetina-delegator-3:
+  zetina-delegator-2:
+    extends:
+      service: zetina-delegator
+    image: zetina-delegator-2
+    hostname: zetina-delegator-2
+    depends_on:
+      - zetina-delegator-3
+    networks:
+      zetina-network:
+        ipv4_address: 172.16.238.3
+    command:
+      - "bash"
+      - "-ci"
+      - "cargo run --release --bin zetina-delegator -- -p 3 -a /ip4/172.16.238.3/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV"
+
+  zetina-executor:
+    image: zetina-executor
     build:
-      dockerfile: delegator.dockerfile
-    image: zetina-delegator-3
-    hostname: zetina-delegator-3
+      dockerfile: executor.dockerfile
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: '1G'
+          cpus: '5'
+          memory: '5G'
     environment:
       - RUST_LOG=info
+
+  zetina-executor-1:
+    extends:
+      service: zetina-executor
+    image: zetina-executor-1
+    hostname: zetina-executor-1
+    depends_on:
+      - zetina-runtime
     networks:
       zetina-network:
-        ipv4_address: 172.16.238.4
-    command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f33 -a /ip4/172.16.238.4/tcp/5679/p2p/QmYaed2psXu4UMTXqrrRUE7PaYnwGFkvGvKvTUBCQSry4S"]
+        ipv4_address: 172.16.238.12
+    command:
+      - "bash"
+      - "-ci"
+      - "cargo run --release --bin zetina-executor -- -p 5 -a /ip4/172.16.238.12/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV"
 
-  # zetina-executor:
-  #   build:
-  #     dockerfile: executor.dockerfile
-  #   image: zetina-executor
-  #   depends_on:
-  #     - zetina-runtime
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1'
-  #         memory: '1G'
-  #   environment:
-  #     - RUST_LOG=debug
-  #   networks:
-  #     zetina-network:
-  #       ipv4_address: 172.16.238.2
-  #   command: ["bash", "-ci", "cargo run --release --bin zetina-executor -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f31"]
+  zetina-executor-2:
+    extends:
+      service: zetina-executor
+    image: zetina-executor-2
+    hostname: zetina-executor-2
+    depends_on:
+      - zetina-runtime
+    networks:
+      zetina-network:
+        ipv4_address: 172.16.238.13
+    command:
+      - "bash"
+      - "-ci"
+      - "cargo run --release --bin zetina-executor -- -p 6 -a /ip4/172.16.238.13/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV"
 
 networks:
   zetina-network:
