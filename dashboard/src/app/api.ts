@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Zod  for DelegateRequest
 export const DelegateRequest = z.object({
-  trace: z.array(z.number()),
+  pie: z.array(z.number()),
 });
 export type DelegateRequest = z.infer<typeof DelegateRequest>;
 
@@ -19,7 +19,7 @@ export const JobEventsRequest = z.object({
 export type JobEventsRequest = z.infer<typeof JobEventsRequest>;
 
 export const JobEventsResponse = z.object({
-  type: z.literal("Picked").or(z.literal("Witness")),
+  type: z.literal("Finished"),
   data: z.any(),
 });
 export type JobEventsResponse = z.infer<typeof JobEventsResponse>;

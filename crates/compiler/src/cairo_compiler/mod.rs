@@ -101,7 +101,7 @@ impl<'identity> CompilerController for CairoCompiler<'identity> {
             let mut cairo_pie_compressed = Vec::new();
             cairo_pie.read_to_end(&mut cairo_pie_compressed)?;
 
-            Ok(Job::try_from_job_data(JobData::new(0, cairo_pie_compressed), self.signing_key))
+            Ok(Job::try_from_job_data(JobData::new(cairo_pie_compressed), self.signing_key))
         });
 
         Ok(Process::new(future, terminate_tx))

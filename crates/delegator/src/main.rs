@@ -1,17 +1,18 @@
 pub mod api;
 pub mod delegator;
-pub mod swarm;
+pub mod job_bid_queue;
 
 use api::ServerState;
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{get, post},
     Router,
 };
 use clap::Parser;
 use delegator::Delegator;
-use libp2p::gossipsub;
-use std::time::Duration;
-use swarm::SwarmRunner;
+use libp2p::Multiaddr;
+use starknet::{core::types::FieldElement, signers::SigningKey};
+use std::{str::FromStr, time::Duration};
 use tokio::{
     net::TcpListener,
     sync::{broadcast, mpsc},
@@ -22,20 +23,17 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing_subscriber::EnvFilter;
-use zetina_common::{
-    graceful_shutdown::shutdown_signal,
-    job::Job,
-    job_witness::JobWitness,
-    network::Network,
-    node_account::NodeAccount,
-    topic::{gossipsub_ident_topic, Topic},
-};
+use zetina_common::{graceful_shutdown::shutdown_signal, job::JobData, job_witness::JobWitness};
+use zetina_peer::swarm::{GossipsubMessage, SwarmRunner};
 
 #[derive(Parser)]
 struct Cli {
     /// The private key as a hex string
     #[arg(short, long)]
     private_key: String,
+
+    #[arg(short, long)]
+    address: String,
 
     #[arg(short, long)]
     dial_addresses: Vec<String>,
@@ -49,34 +47,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // TODO: common setup in node initiate binary
-    let network = Network::Sepolia;
     let private_key = hex::decode(cli.private_key)?;
+    let secret_key = libp2p::identity::ecdsa::SecretKey::try_from_bytes(private_key.as_slice())?;
+    let p2p_keypair =
+        libp2p::identity::Keypair::from(libp2p::identity::ecdsa::Keypair::from(secret_key));
 
-    let node_account = NodeAccount::new(private_key);
+    let signing_key = SigningKey::from_secret_scalar(
+        FieldElement::from_byte_slice_be(private_key.as_slice()).unwrap(),
+    );
 
-    // Generate topic
-    let job_topic = gossipsub_ident_topic(network, Topic::NewJob);
-    let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
-    let finished_job_topic = gossipsub_ident_topic(network, Topic::FinishedJob);
+    let mut swarm_runner =
+        SwarmRunner::new(p2p_keypair, Multiaddr::from_str(&cli.address).unwrap())?;
 
-    let (swarm_events_tx, swarm_events_rx) = mpsc::channel::<gossipsub::Event>(100);
-    let (job_picked_tx, job_picked_rx) = broadcast::channel::<Job>(100);
-    let (job_witness_tx, job_witness_rx) = broadcast::channel::<JobWitness>(100);
+    cli.dial_addresses
+        .into_iter()
+        .try_for_each(|addr| swarm_runner.swarm.dial(Multiaddr::from_str(&addr).unwrap()))
+        .unwrap();
 
-    let (job_topic_tx, job_topic_rx) = mpsc::channel::<Vec<u8>>(100);
+    let (gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
+    let (delegate_tx, delegate_rx) = mpsc::channel::<JobData>(100);
+    let (finished_tx, finished_rx) = broadcast::channel::<JobWitness>(100);
+    let swarm_events = swarm_runner.run(gossipsub_rx);
 
-    SwarmRunner::new(
-        cli.dial_addresses,
-        node_account.get_keypair(),
-        vec![job_topic.to_owned(), picked_job_topic, finished_job_topic],
-        vec![(job_topic, job_topic_rx)],
-        swarm_events_tx,
-    )?;
-
-    Delegator::new(job_picked_tx, job_witness_tx, swarm_events_rx);
+    Delegator::new(swarm_events, gossipsub_tx, delegate_rx, finished_tx, signing_key);
 
     // Create a `TcpListener` using tokio.
-    let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
 
     // Run the server with graceful shutdown
     axum::serve(
@@ -90,13 +86,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // requests don't hang forever.
                 TimeoutLayer::new(Duration::from_secs(10)),
                 CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any),
+                DefaultBodyLimit::disable(),
             ))
-            .with_state(ServerState {
-                signing_key: node_account.get_signing_key().to_owned(),
-                job_topic_tx,
-                job_picked_rx,
-                job_witness_rx,
-            }),
+            .with_state(ServerState { delegate_tx, finished_rx }),
     )
     .with_graceful_shutdown(shutdown_signal())
     .await?;

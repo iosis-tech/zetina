@@ -147,25 +147,19 @@ func execute{builtin_ptrs: BuiltinData*, self_range_check_ptr}(
         use_poseidon=use_poseidon,
     );
 
-    local reward: felt;
-    local num_of_steps: felt;
     local executor: felt;
     local delegator: felt;
 
     %{
-        ids.reward = simple_bootloader_input.job.job_data.reward
-        ids.num_of_steps = simple_bootloader_input.job.job_data.num_of_steps
         ids.executor = simple_bootloader_input.public_key
         ids.delegator = simple_bootloader_input.job.public_key
     %}
 
-    assert [builtin_ptrs.output + 0] = reward;
-    assert [builtin_ptrs.output + 1] = num_of_steps;
-    assert [builtin_ptrs.output + 2] = executor;
-    assert [builtin_ptrs.output + 3] = delegator;
+    assert [builtin_ptrs.output + 0] = executor;
+    assert [builtin_ptrs.output + 1] = delegator;
 
     local return_builtin_ptrs: BuiltinData = BuiltinData(
-        output=builtin_ptrs.output + 4,
+        output=builtin_ptrs.output + 2,
         pedersen=builtin_ptrs.pedersen,
         range_check=builtin_ptrs.range_check,
         ecdsa=builtin_ptrs.ecdsa,
