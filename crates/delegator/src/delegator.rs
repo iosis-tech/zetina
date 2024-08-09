@@ -14,7 +14,6 @@ use tracing::{error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
 use zetina_common::hash;
 use zetina_common::job::{Job, JobData, JobDelegation};
-use zetina_common::job_witness::JobWitness;
 use zetina_common::process::Process;
 use zetina_peer::swarm::{
     DelegationMessage, GossipsubMessage, MarketMessage, PeerBehaviourEvent, Topic,
@@ -29,7 +28,7 @@ impl Delegator {
         mut swarm_events: Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + Send>>,
         gossipsub_tx: Sender<GossipsubMessage>,
         mut delegate_rx: mpsc::Receiver<JobData>,
-        finished_tx: broadcast::Sender<JobWitness>,
+        events_tx: broadcast::Sender<(u64, DelegatorEvent)>,
         signing_key: SigningKey,
     ) -> Self {
         Self {
@@ -60,6 +59,7 @@ impl Delegator {
                                                 if let Some(bid_tx) =  job_hash_store.get_mut(&job_bid.job_hash) {
                                                     info!("Received job bid: {} price: {} from: {}", job_bid.job_hash, job_bid.price, propagation_source);
                                                     bid_tx.send((job_bid.price, propagation_source)).await?;
+                                                    events_tx.send((job_bid.job_hash, DelegatorEvent::BidReceived(propagation_source)))?;
                                                 }
                                             }
                                             _ => {}
@@ -69,7 +69,7 @@ impl Delegator {
                                         match serde_json::from_slice::<DelegationMessage>(&message.data)? {
                                             DelegationMessage::Finished(job_witness) => {
                                                 info!("Received finished job: {}", job_witness.job_hash);
-                                                finished_tx.send(job_witness)?;
+                                                events_tx.send((job_witness.job_hash, DelegatorEvent::Finished(job_witness.proof)))?;
                                             }
                                             _ => {}
                                         }
@@ -81,15 +81,14 @@ impl Delegator {
                         Some(Ok((job, bids))) = job_bid_scheduler.next() => {
                             job_hash_store.remove(&hash!(job));
                             let bid = bids.first_key_value().unwrap();
-                            info!("Job {} delegated to best bidder: {}", hash!(job), *bid.1.first().unwrap());
+                            let price = *bid.0;
+                            let identity = *bid.1.first().unwrap();
+                            info!("Job {} delegated to best bidder: {}", hash!(job), identity);
                             gossipsub_tx.send(GossipsubMessage {
                                 topic: Topic::Delegation.into(),
-                                data: serde_json::to_vec(&DelegationMessage::Delegate(JobDelegation{
-                                    identity: *bid.1.first().unwrap(),
-                                    job,
-                                    price: *bid.0
-                                }))?
+                                data: serde_json::to_vec(&DelegationMessage::Delegate(JobDelegation{identity, job: job.to_owned(), price}))?
                             }).await?;
+                            events_tx.send((hash!(job), DelegatorEvent::Delegated(identity)))?;
                         }
                         _ = shutdown_signal() => {
                             break
@@ -114,13 +113,20 @@ impl Drop for Delegator {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum DelegatorEvent {
+    BidReceived(PeerId),
+    Delegated(PeerId),
+    Finished(Vec<u8>),
+}
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("mpsc_send_error GossipsubMessage")]
     MpscSendErrorGossipsubMessage(#[from] mpsc::error::SendError<GossipsubMessage>),
 
-    #[error("mpsc_send_error JobWitness")]
-    BreadcastSendErrorJobWitness(#[from] broadcast::error::SendError<JobWitness>),
+    #[error("mpsc_send_error DelegatorEvent")]
+    BreadcastSendErrorDelegatorEvent(#[from] broadcast::error::SendError<(u64, DelegatorEvent)>),
 
     #[error("mpsc_send_error JobBid")]
     MpscSendErrorJobBid(#[from] mpsc::error::SendError<(u64, PeerId)>),

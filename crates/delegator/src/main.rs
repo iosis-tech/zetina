@@ -9,7 +9,7 @@ use axum::{
     Router,
 };
 use clap::Parser;
-use delegator::Delegator;
+use delegator::{Delegator, DelegatorEvent};
 use libp2p::Multiaddr;
 use starknet::{core::types::FieldElement, signers::SigningKey};
 use std::{str::FromStr, time::Duration};
@@ -23,7 +23,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing_subscriber::EnvFilter;
-use zetina_common::{graceful_shutdown::shutdown_signal, job::JobData, job_witness::JobWitness};
+use zetina_common::{graceful_shutdown::shutdown_signal, job::JobData};
 use zetina_peer::swarm::{GossipsubMessage, SwarmRunner};
 
 #[derive(Parser)]
@@ -66,10 +66,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
     let (delegate_tx, delegate_rx) = mpsc::channel::<JobData>(100);
-    let (finished_tx, finished_rx) = broadcast::channel::<JobWitness>(100);
+    let (events_tx, events_rx) = broadcast::channel::<(u64, DelegatorEvent)>(100);
     let swarm_events = swarm_runner.run(gossipsub_rx);
 
-    Delegator::new(swarm_events, gossipsub_tx, delegate_rx, finished_tx, signing_key);
+    Delegator::new(swarm_events, gossipsub_tx, delegate_rx, events_tx, signing_key);
 
     // Create a `TcpListener` using tokio.
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -88,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any),
                 DefaultBodyLimit::disable(),
             ))
-            .with_state(ServerState { delegate_tx, finished_rx }),
+            .with_state(ServerState { delegate_tx, events_rx }),
     )
     .with_graceful_shutdown(shutdown_signal())
     .await?;

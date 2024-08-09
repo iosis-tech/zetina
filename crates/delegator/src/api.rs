@@ -6,25 +6,25 @@ use axum::{
 };
 use futures::StreamExt;
 use hyper::StatusCode;
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::{io, time::Duration};
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::Stream;
-use zetina_common::{hash, job::JobData, job_witness::JobWitness};
+use zetina_common::{hash, job::JobData};
+
+use crate::delegator::DelegatorEvent;
 
 #[derive(Debug)]
 pub struct ServerState {
     pub delegate_tx: mpsc::Sender<JobData>,
-    pub finished_rx: broadcast::Receiver<JobWitness>,
+    pub events_rx: broadcast::Receiver<(u64, DelegatorEvent)>,
 }
 
 impl Clone for ServerState {
     fn clone(&self) -> Self {
-        Self {
-            delegate_tx: self.delegate_tx.to_owned(),
-            finished_rx: self.finished_rx.resubscribe(),
-        }
+        Self { delegate_tx: self.delegate_tx.to_owned(), events_rx: self.events_rx.resubscribe() }
     }
 }
 
@@ -56,6 +56,8 @@ pub struct JobEventsRequest {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", content = "data")]
 pub enum JobEventsResponse {
+    BidReceived(PeerId),
+    Delegated(PeerId),
     Finished(Vec<u8>),
 }
 
@@ -68,10 +70,16 @@ pub async fn job_events_handler(
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
         loop {
             tokio::select! {
-                Ok(job_witness) = state.finished_rx.recv() => {
-                    if job_witness.job_hash == job_hash {
+                Ok((hash, event)) = state.events_rx.recv() => {
+                    if hash == job_hash {
                         yield Event::default()
-                            .json_data(JobEventsResponse::Finished(job_witness.proof))
+                            .json_data(
+                                match event {
+                                    DelegatorEvent::BidReceived(peer_id) => { JobEventsResponse::BidReceived(peer_id) },
+                                    DelegatorEvent::Delegated(peer_id) => { JobEventsResponse::Delegated(peer_id) },
+                                    DelegatorEvent::Finished(data) => { JobEventsResponse::Finished(data) },
+                                }
+                            )
                             .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e.to_string()));
                     }
                 }
