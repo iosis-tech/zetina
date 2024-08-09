@@ -1,6 +1,6 @@
 pub mod api;
+pub mod bid_queue;
 pub mod delegator;
-pub mod job_bid_queue;
 
 use api::ServerState;
 use axum::{

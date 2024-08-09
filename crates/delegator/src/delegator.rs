@@ -1,7 +1,10 @@
-use crate::job_bid_queue::JobBidQueue;
+use crate::bid_queue::{BidControllerError, BidQueue};
+use futures::stream::FuturesUnordered;
 use futures::Stream;
-use libp2p::gossipsub;
+use libp2p::{gossipsub, PeerId};
 use starknet::signers::SigningKey;
+use std::collections::{BTreeMap, HashMap};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::pin::Pin;
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc};
@@ -9,8 +12,10 @@ use tokio::{sync::mpsc::Sender, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tracing::{error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
+use zetina_common::hash;
 use zetina_common::job::{Job, JobData, JobDelegation};
 use zetina_common::job_witness::JobWitness;
+use zetina_common::process::Process;
 use zetina_peer::swarm::{
     DelegationMessage, GossipsubMessage, MarketMessage, PeerBehaviourEvent, Topic,
 };
@@ -29,7 +34,10 @@ impl Delegator {
     ) -> Self {
         Self {
             handle: Some(tokio::spawn(async move {
-                let mut job_bid_queue = JobBidQueue::new();
+                let mut job_bid_scheduler = FuturesUnordered::<
+                    Process<Result<(Job, BTreeMap<u64, Vec<PeerId>>), BidControllerError>>,
+                >::new();
+                let mut job_hash_store = HashMap::<u64, mpsc::Sender<(u64, PeerId)>>::new();
                 loop {
                     tokio::select! {
                         Some(job_data) = delegate_rx.recv() => {
@@ -38,7 +46,9 @@ impl Delegator {
                                 topic: Topic::Market.into(),
                                 data: serde_json::to_vec(&MarketMessage::Job(job.to_owned()))?
                             }).await?;
-                            job_bid_queue.insert_job(job);
+                            let (process, bid_tx) = BidQueue::run(job.to_owned());
+                            job_bid_scheduler.push(process);
+                            job_hash_store.insert(hash!(job), bid_tx);
                         },
                         Some(event) = swarm_events.next() => {
                             match event {
@@ -46,17 +56,8 @@ impl Delegator {
                                     if message.topic == Topic::Market.into() {
                                         match serde_json::from_slice::<MarketMessage>(&message.data)? {
                                             MarketMessage::JobBid(job_bid) => {
-                                                job_bid_queue.insert_bid(job_bid.to_owned(), propagation_source);
-                                                if let Some((job, identity, price)) = job_bid_queue.get_best(job_bid.job_hash) {
-                                                    job_bid_queue.remove_job(job_bid.job_hash);
-                                                    gossipsub_tx.send(GossipsubMessage {
-                                                        topic: Topic::Delegation.into(),
-                                                        data: serde_json::to_vec(&DelegationMessage::Delegate(JobDelegation{
-                                                            identity,
-                                                            job,
-                                                            price
-                                                        }))?
-                                                    }).await?;
+                                                if let Some(bid_tx) =  job_hash_store.get_mut(&job_bid.job_hash) {
+                                                    bid_tx.send((job_bid.price, propagation_source)).await?;
                                                 }
                                             }
                                             _ => {}
@@ -74,6 +75,19 @@ impl Delegator {
                                 }
                                 _ => {}
                             }
+                        }
+                        Some(Ok((job, bids))) = job_bid_scheduler.next() => {
+                            job_hash_store.remove(&hash!(job));
+                            let bid = bids.first_key_value().unwrap();
+                            gossipsub_tx.send(GossipsubMessage {
+                                topic: Topic::Delegation.into(),
+                                data: serde_json::to_vec(&DelegationMessage::Delegate(JobDelegation{
+                                    identity: *bid.1.first().unwrap(),
+                                    job,
+                                    price: *bid.0
+                                }))?
+                            }).await?;
+                            todo!()
                         }
                         _ = shutdown_signal() => {
                             break
@@ -105,6 +119,9 @@ pub enum Error {
 
     #[error("mpsc_send_error JobWitness")]
     BreadcastSendErrorJobWitness(#[from] broadcast::error::SendError<JobWitness>),
+
+    #[error("mpsc_send_error JobBid")]
+    MpscSendErrorJobBid(#[from] mpsc::error::SendError<(u64, PeerId)>),
 
     #[error("io")]
     Io(#[from] std::io::Error),
