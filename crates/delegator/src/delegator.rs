@@ -46,6 +46,7 @@ impl Delegator {
                                 topic: Topic::Market.into(),
                                 data: serde_json::to_vec(&MarketMessage::Job(job.to_owned()))?
                             }).await?;
+                            info!("Propagated job: {} for bidding", hash!(job));
                             let (process, bid_tx) = BidQueue::run(job.to_owned());
                             job_bid_scheduler.push(process);
                             job_hash_store.insert(hash!(job), bid_tx);
@@ -57,6 +58,7 @@ impl Delegator {
                                         match serde_json::from_slice::<MarketMessage>(&message.data)? {
                                             MarketMessage::JobBid(job_bid) => {
                                                 if let Some(bid_tx) =  job_hash_store.get_mut(&job_bid.job_hash) {
+                                                    info!("Received job bid: {} price: {} from: {}", job_bid.job_hash, job_bid.price, propagation_source);
                                                     bid_tx.send((job_bid.price, propagation_source)).await?;
                                                 }
                                             }
@@ -79,6 +81,7 @@ impl Delegator {
                         Some(Ok((job, bids))) = job_bid_scheduler.next() => {
                             job_hash_store.remove(&hash!(job));
                             let bid = bids.first_key_value().unwrap();
+                            info!("Job {} delegated to best bidder: {}", hash!(job), *bid.1.first().unwrap());
                             gossipsub_tx.send(GossipsubMessage {
                                 topic: Topic::Delegation.into(),
                                 data: serde_json::to_vec(&DelegationMessage::Delegate(JobDelegation{
@@ -87,7 +90,6 @@ impl Delegator {
                                     price: *bid.0
                                 }))?
                             }).await?;
-                            todo!()
                         }
                         _ = shutdown_signal() => {
                             break
