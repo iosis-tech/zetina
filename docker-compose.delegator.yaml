@@ -1,0 +1,20 @@
+services:
+  zetina-delegator-1:
+    build:
+      dockerfile: delegator.dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+    environment:
+      - RUST_LOG=info
+    image: registry.internal.iosis.tech/zetina-delegator
+    hostname: zetina-delegator-1
+    ports:
+      - "3000:3000"
+      - "5679:5679"
+    command:
+      - "bash"
+      - "-ci"
+      - "cargo run --release --bin zetina-delegator -- -l /ip4/0.0.0.0/tcp/5679  -p 01051702270300e09b88e43a64e5145d3de01241d5d271e99144192fe326de7b -a /ip4/10.5.5.10/tcp/5679/p2p/QmW9NwzLo9JiECyQs4FjVHt9q6hZeqNoRhDgw8B6v95dMb -d /ip4/10.4.4.154/tcp/5683/p2p/QmXu6d3vcTfCHsyfwqSzfo4n11NK5cMS9FX35GafDJx3z7"

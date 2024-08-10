@@ -20,7 +20,6 @@ bootloader*.json
 
 # Docker
 *.dockerfile
-*docker-compose*.yaml
 
 # Miscellaneous
 *.log

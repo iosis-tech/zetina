@@ -1,0 +1,15 @@
+services:
+  zetina-stone-prover:
+    image: registry.internal.iosis.tech/zetina-stone-prover
+
+  zetina-runtime:
+    image: registry.internal.iosis.tech/zetina-runtime
+
+  zetina-delegator-1:
+    image: registry.internal.iosis.tech/zetina-delegator
+
+  zetina-executor-1:
+    image: registry.internal.iosis.tech/zetina-executor
+
+  zetina-executor-2:
+    image: registry.internal.iosis.tech/zetina-executor
