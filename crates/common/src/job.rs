@@ -103,6 +103,7 @@ impl Display for Job {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct JobBid {
+    pub identity: PeerId,
     pub job_hash: u64,
     pub price: u64,
 }

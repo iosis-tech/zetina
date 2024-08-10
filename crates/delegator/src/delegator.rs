@@ -52,14 +52,14 @@ impl Delegator {
                         },
                         Some(event) = swarm_events.next() => {
                             match event {
-                                PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message { message, propagation_source, .. }) => {
+                                PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message { message, .. }) => {
                                     if message.topic == Topic::Market.into() {
                                         match serde_json::from_slice::<MarketMessage>(&message.data)? {
                                             MarketMessage::JobBid(job_bid) => {
                                                 if let Some(bid_tx) =  job_hash_store.get_mut(&job_bid.job_hash) {
-                                                    info!("Received job bid: {} price: {} from: {}", job_bid.job_hash, job_bid.price, propagation_source);
-                                                    bid_tx.send((job_bid.price, propagation_source)).await?;
-                                                    events_tx.send((job_bid.job_hash, DelegatorEvent::BidReceived(propagation_source)))?;
+                                                    info!("Received job bid: {} price: {} from: {}", job_bid.job_hash, job_bid.price, job_bid.identity);
+                                                    bid_tx.send((job_bid.price, job_bid.identity)).await?;
+                                                    events_tx.send((job_bid.job_hash, DelegatorEvent::BidReceived(job_bid.identity)))?;
                                                 }
                                             }
                                             _ => {}

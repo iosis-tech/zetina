@@ -53,6 +53,7 @@ impl Executor {
                                                     .send(GossipsubMessage {
                                                         topic: Topic::Market.into(),
                                                         data: serde_json::to_vec(&MarketMessage::JobBid(JobBid {
+                                                            identity,
                                                             job_hash: hash!(job),
                                                             price: (runner_scheduler.len() * prover_scheduler.len()) as u64,
                                                         }))?
