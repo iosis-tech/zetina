@@ -9,10 +9,10 @@ services:
           memory: '1G'
     environment:
       - RUST_LOG=info
-    image: registry.internal.iosis.tech/zetina-delegator
+    image: zetina-delegator
     hostname: zetina-delegator-1
     ports:
-      - "3000:3000"
+      - "4000:3000"
       - "5679:5679"
     command:
       - "bash"
