@@ -80,6 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Router::new()
             .route("/delegate", post(api::deletage_handler))
             .route("/job_events", get(api::job_events_handler))
+            .route("/health", get(api::health_check_handler))
             .layer((
                 TraceLayer::new_for_http(),
                 // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so

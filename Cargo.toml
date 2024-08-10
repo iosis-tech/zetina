@@ -12,7 +12,6 @@ members = [
     "crates/prover",
     "crates/runner",
     "crates/tests",
-
 ]
 exclude = []
 

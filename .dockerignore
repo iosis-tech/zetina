@@ -2,17 +2,17 @@
 venv/
 env/
 
-# Ignore Rust-related files
+# Ignore Rust build output and related files
 debug/
 target/
 Cargo.lock
 *.rs.bk
 *.pdb
-/target
 Scarb.lock
 .snfoundry_cache/
-stone-prover
 bootloader*.json
+
+# Ignore unnecessary Docker-related files
 *.dockerfile
 *docker-compose*.yaml
 
@@ -26,9 +26,28 @@ build/
 # Ignore IPython/Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
-# Additional Docker-specific ignores
-.dockerignore
-.dockerignore.template
-.dockerignore.generated
-.dockerignore.custom
-.dockerignore.local
+# Miscellaneous
+*.log
+*.swp
+*.swo
+.env
+
+# IDE-specific
+.vscode/
+.idea/
+
+# System-specific
+.DS_Store
+Thumbs.db
+
+# Directories not needed in Docker context
+dashboard/
+k8s/
+docs/
+registry/
+utils/
+.git/
+.github/
+
+# Secrets
+*secret*

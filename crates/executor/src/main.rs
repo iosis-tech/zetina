@@ -1,6 +1,7 @@
+pub mod api;
 pub mod executor;
 
-use axum::Router;
+use axum::{routing::get, Router};
 use clap::Parser;
 use executor::Executor;
 use libp2p::Multiaddr;
@@ -74,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Run the server with graceful shutdown
     axum::serve(
         listener,
-        Router::new().layer((
+        Router::new().route("/health", get(api::health_check_handler)).layer((
             TraceLayer::new_for_http(),
             // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
             // requests don't hang forever.

@@ -1,7 +1,7 @@
 use async_stream::stream;
 use axum::{
     extract::{Query, State},
-    response::{sse::Event, Sse},
+    response::{sse::Event, IntoResponse, Sse},
     Json,
 };
 use futures::StreamExt;
@@ -26,6 +26,10 @@ impl Clone for ServerState {
     fn clone(&self) -> Self {
         Self { delegate_tx: self.delegate_tx.to_owned(), events_rx: self.events_rx.resubscribe() }
     }
+}
+
+pub async fn health_check_handler() -> impl IntoResponse {
+    (StatusCode::OK, "Health check: OK")
 }
 
 #[derive(Debug, Deserialize)]

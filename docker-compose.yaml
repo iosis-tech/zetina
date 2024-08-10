@@ -3,12 +3,12 @@ services:
     build:
       context: stone-prover
       dockerfile: Dockerfile
-    image: zetina-stone-prover
+    image: registry.internal.iosis.tech/zetina-stone-prover
 
   zetina-runtime:
     build:
       dockerfile: runtime.dockerfile
-    image: zetina-runtime
+    image: registry.internal.iosis.tech/zetina-runtime
     depends_on:
       - zetina-stone-prover
 
@@ -22,7 +22,7 @@ services:
           memory: '1G'
     environment:
       - RUST_LOG=info
-    image: zetina-delegator-1
+    image: registry.internal.iosis.tech/zetina-delegator
     hostname: zetina-delegator-1
     networks:
       zetina-network:
@@ -32,7 +32,7 @@ services:
     command:
       - "bash"
       - "-ci"
-      - "cargo run --release --bin zetina-delegator -- -p 0000000000000000000000000000000000000000000000000000000000000002 -a /ip4/172.16.238.2/tcp/5679/p2p/QmQ1eZZaY4nkWAzHSw4c9n2aAnRexdVbfDLbnW3hdVjYgM"
+      - "cargo run --release --bin zetina-delegator -- -p ${PRIVATE_KEY_1} -a /ip4/172.16.238.2/tcp/5679/p2p/${PEER_ID_1}"
 
   zetina-executor-1:
     build:
@@ -47,7 +47,7 @@ services:
           memory: '15G'
     environment:
       - RUST_LOG=info
-    image: zetina-executor-1
+    image: registry.internal.iosis.tech/zetina-executor
     hostname: zetina-executor-1
     networks:
       zetina-network:
@@ -55,7 +55,7 @@ services:
     command:
       - "bash"
       - "-ci"
-      - "cargo run --release --bin zetina-executor -- -p 000000000000000000000000000000000000000000000000000000000000000c -a /ip4/172.16.238.12/tcp/5679/p2p/QmeRkDGeobqjsmbHp8xPmvRR7XoV3zW3WGuSsDzxJoDyhH -d /ip4/172.16.238.2/tcp/5679/p2p/QmQ1eZZaY4nkWAzHSw4c9n2aAnRexdVbfDLbnW3hdVjYgM"
+      - "cargo run --release --bin zetina-executor -- -p ${PRIVATE_KEY_2} -a /ip4/172.16.238.12/tcp/5679/p2p/${PEER_ID_2} -d /ip4/172.16.238.2/tcp/5679/p2p/${PEER_ID_1}"
 
   zetina-executor-2:
     build:
@@ -70,7 +70,7 @@ services:
           memory: '15G'
     environment:
       - RUST_LOG=info
-    image: zetina-executor-2
+    image: registry.internal.iosis.tech/zetina-executor
     hostname: zetina-executor-2
     networks:
       zetina-network:
@@ -78,7 +78,7 @@ services:
     command:
       - "bash"
       - "-ci"
-      - "cargo run --release --bin zetina-executor -- -p 000000000000000000000000000000000000000000000000000000000000000d -a /ip4/172.16.238.13/tcp/5679/p2p/Qmf5KNDUcjjVmXz6CWzucymb3Gv1BHNypuY111Pb3Rx3xt -d /ip4/172.16.238.2/tcp/5679/p2p/QmQ1eZZaY4nkWAzHSw4c9n2aAnRexdVbfDLbnW3hdVjYgM"
+      - "cargo run --release --bin zetina-executor -- -p ${PRIVATE_KEY_3} -a /ip4/172.16.238.13/tcp/5679/p2p/${PEER_ID_3} -d /ip4/172.16.238.2/tcp/5679/p2p/${PEER_ID_1}"
 
 networks:
   zetina-network:

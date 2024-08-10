@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: iosis-tech-zetina
+
+resources:
+- executor/deployment-1.yaml
+- executor/deployment-2.yaml
+- executor/deployment-3.yaml
+
+configMapGenerator:
+- name: zetina-config
+  literals:
+  - RUST_LOG=info
+  - CAIRO_PATH=cairo
+  - BOOTLOADER_PATH=bootloader/starknet/simple_bootloader.cairo
+  - BOOTLOADER_OUT_NAME=bootloader.json
+  options:
+    disableNameSuffixHash: true
+
+secretGenerator:
+- name: zetina-secret
+  envs:
+  - secret.env
+  options:
+    disableNameSuffixHash: true
