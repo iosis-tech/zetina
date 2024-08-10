@@ -3,12 +3,12 @@ services:
     build:
       context: stone-prover
       dockerfile: Dockerfile
-    image: zetina-stone-prover
+    image: registry.internal.iosis.tech/zetina-stone-prover
 
   zetina-runtime:
     build:
       dockerfile: runtime.dockerfile
-    image: zetina-runtime
+    image: registry.internal.iosis.tech/zetina-runtime
     depends_on:
       - zetina-stone-prover
 
@@ -22,7 +22,7 @@ services:
           memory: '1G'
     environment:
       - RUST_LOG=info
-    image: zetina-delegator
+    image: registry.internal.iosis.tech/zetina-delegator
     hostname: zetina-delegator-1
     networks:
       zetina-network:
@@ -47,7 +47,7 @@ services:
           memory: '15G'
     environment:
       - RUST_LOG=info
-    image: zetina-executor
+    image: registry.internal.iosis.tech/zetina-executor
     hostname: zetina-executor-1
     networks:
       zetina-network:
@@ -70,7 +70,7 @@ services:
           memory: '15G'
     environment:
       - RUST_LOG=info
-    image: zetina-executor
+    image: registry.internal.iosis.tech/zetina-executor
     hostname: zetina-executor-2
     networks:
       zetina-network:
