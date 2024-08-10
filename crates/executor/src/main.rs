@@ -22,6 +22,9 @@ struct Cli {
     private_key: String,
 
     #[arg(short, long)]
+    listen_address: String,
+
+    #[arg(short, long)]
     address: String,
 
     #[arg(short, long)]
@@ -53,8 +56,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .join("../../");
     let bootloader_program_path = ws_root.join("target/bootloader.json");
 
-    let mut swarm_runner =
-        SwarmRunner::new(p2p_keypair, Multiaddr::from_str(&cli.address).unwrap())?;
+    let mut swarm_runner = SwarmRunner::new(
+        cli.listen_address.parse()?,
+        p2p_keypair,
+        Multiaddr::from_str(&cli.address).unwrap(),
+    )?;
 
     cli.dial_addresses
         .into_iter()

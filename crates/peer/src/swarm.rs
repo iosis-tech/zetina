@@ -77,6 +77,7 @@ pub enum DelegationMessage {
 
 impl SwarmRunner {
     pub fn new(
+        listen_multiaddr: Multiaddr,
         p2p_keypair: Keypair,
         p2p_multiaddr: Multiaddr,
     ) -> Result<Self, Box<dyn std::error::Error>> {
@@ -98,7 +99,7 @@ impl SwarmRunner {
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Market.as_str()))?;
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Delegation.as_str()))?;
         // swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
-        swarm.listen_on("/ip4/0.0.0.0/tcp/5679".parse()?)?;
+        swarm.listen_on(listen_multiaddr)?;
 
         Ok(SwarmRunner { swarm, p2p_multiaddr })
     }

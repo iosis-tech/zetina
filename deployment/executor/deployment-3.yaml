@@ -13,20 +13,20 @@ spec:
         app: executor-3
     spec:
       initContainers:
-      - name: wait-for-executor-3
+      - name: wait-for-executor-2
         image: curlimages/curl:latest
         command:
         - "sh"
         - "-c"
         - |
-          until curl -sf http://executor-1-service:3000/health | grep -q "Health check: OK"; do
-            echo "Waiting for executor-1 to be ready..."
+          until curl -sf http://executor-2-service.iosis-tech-zetina.svc.cluster.local:3000/health | grep -q "Health check: OK"; do
+            echo "Waiting for executor-2 to be ready..."
             sleep 1
           done
       containers:
       - name: executor-3
         image: registry.internal.iosis.tech/zetina-executor:latest
-        args: ["bash", "-ci", "cargo run --release --bin zetina-executor -- -p $(PRIVATE_KEY) -a $(ADDRESS) -d $(DIAL)"]
+        args: ["bash", "-ci", "cargo run --release --bin zetina-executor -- -l /ip4/0.0.0.0/tcp/5683 -p $(PRIVATE_KEY) -a $(ADDRESS) -d $(DIAL)"]
         resources:
           requests:
             cpu: "1"
@@ -69,11 +69,11 @@ spec:
           valueFrom:
             secretKeyRef:
               name: zetina-secret
-              key: ADDRESS_1
+              key: ADDRESS_2
         ports:
         - containerPort: 3000
-        - containerPort: 5678
-        - containerPort: 5679
+        - containerPort: 5682
+        - containerPort: 5683
 ---
 apiVersion: v1
 kind: Service
@@ -90,11 +90,11 @@ spec:
     protocol: TCP
     name: api-port
   - port: 5682
-    targetPort: 5678
+    targetPort: 5682
     protocol: UDP
     name: p2p-quic-port
   - port: 5683
-    targetPort: 5679
+    targetPort: 5683
     protocol: TCP
     name: p2p-tcp-port
   selector:

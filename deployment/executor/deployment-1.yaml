@@ -15,7 +15,7 @@ spec:
       containers:
       - name: executor-1
         image: registry.internal.iosis.tech/zetina-executor:latest
-        args: ["bash", "-ci", "cargo run --release --bin zetina-executor -- -p $(PRIVATE_KEY) -a $(ADDRESS)"]
+        args: ["bash", "-ci", "cargo run --release --bin zetina-executor -- -l /ip4/0.0.0.0/tcp/5679 -p $(PRIVATE_KEY) -a $(ADDRESS)"]
         resources:
           requests:
             cpu: "1"

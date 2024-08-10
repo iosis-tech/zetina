@@ -11,7 +11,7 @@ resources:
 configMapGenerator:
 - name: zetina-config
   literals:
-  - RUST_LOG=info
+  - RUST_LOG=debug
   - CAIRO_PATH=cairo
   - BOOTLOADER_PATH=bootloader/starknet/simple_bootloader.cairo
   - BOOTLOADER_OUT_NAME=bootloader.json

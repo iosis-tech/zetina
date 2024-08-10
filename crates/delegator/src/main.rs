@@ -33,6 +33,9 @@ struct Cli {
     private_key: String,
 
     #[arg(short, long)]
+    listen_address: String,
+
+    #[arg(short, long)]
     address: String,
 
     #[arg(short, long)]
@@ -56,8 +59,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         FieldElement::from_byte_slice_be(private_key.as_slice()).unwrap(),
     );
 
-    let mut swarm_runner =
-        SwarmRunner::new(p2p_keypair, Multiaddr::from_str(&cli.address).unwrap())?;
+    let mut swarm_runner = SwarmRunner::new(
+        cli.listen_address.parse()?,
+        p2p_keypair,
+        Multiaddr::from_str(&cli.address).unwrap(),
+    )?;
 
     cli.dial_addresses
         .into_iter()
