@@ -6,7 +6,7 @@ use axum::{
 };
 use futures::StreamExt;
 use hyper::StatusCode;
-use libp2p::PeerId;
+use libp2p::{kad, PeerId};
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::{io, time::Duration};
@@ -19,7 +19,7 @@ use crate::delegator::DelegatorEvent;
 #[derive(Debug)]
 pub struct ServerState {
     pub delegate_tx: mpsc::Sender<JobData>,
-    pub events_rx: broadcast::Receiver<(u64, DelegatorEvent)>,
+    pub events_rx: broadcast::Receiver<(kad::RecordKey, DelegatorEvent)>,
 }
 
 impl Clone for ServerState {
@@ -39,7 +39,7 @@ pub struct DelegateRequest {
 
 #[derive(Debug, Serialize)]
 pub struct DelegateResponse {
-    job_hash: String,
+    job_hash: kad::RecordKey,
 }
 
 pub async fn deletage_handler(
@@ -47,14 +47,14 @@ pub async fn deletage_handler(
     Json(input): Json<DelegateRequest>,
 ) -> Result<Json<DelegateResponse>, StatusCode> {
     let job_data = JobData::new(input.pie);
-    let job_data_hash = hash!(&job_data);
+    let job_data_hash = kad::RecordKey::new(&hash!(job_data).to_be_bytes());
     state.delegate_tx.send(job_data).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(DelegateResponse { job_hash: job_data_hash.to_string() }))
+    Ok(Json(DelegateResponse { job_hash: job_data_hash }))
 }
 
 #[derive(Debug, Deserialize)]
 pub struct JobEventsRequest {
-    job_hash: String,
+    job_hash: kad::RecordKey,
 }
 
 #[derive(Debug, Serialize)]
@@ -70,8 +70,7 @@ pub async fn job_events_handler(
     Query(input): Query<JobEventsRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, io::Error>>> {
     let stream = stream! {
-        let job_hash = input.job_hash.parse::<u64>()
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+        let job_hash = input.job_hash;
         loop {
             tokio::select! {
                 Ok((hash, event)) = state.events_rx.recv() => {

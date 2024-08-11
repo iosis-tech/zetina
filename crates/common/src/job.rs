@@ -1,6 +1,6 @@
 use crate::hash;
 use cairo_vm::vm::runners::cairo_pie::CairoPie;
-use libp2p::PeerId;
+use libp2p::{kad, PeerId};
 use serde::{Deserialize, Serialize};
 use starknet::signers::{SigningKey, VerifyingKey};
 use starknet_crypto::{poseidon_hash_many, FieldElement, Signature};
@@ -101,17 +101,10 @@ impl Display for Job {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobBid {
     pub identity: PeerId,
-    pub job_hash: u64,
-    pub price: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct JobDelegation {
-    pub identity: PeerId,
-    pub job: Job,
+    pub job_key: kad::RecordKey,
     pub price: u64,
 }
 

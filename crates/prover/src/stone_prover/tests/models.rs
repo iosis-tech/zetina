@@ -1,3 +1,4 @@
+use libp2p::kad;
 use std::{env, fs, io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
 use zetina_common::job_trace::JobTrace;
@@ -28,12 +29,12 @@ pub fn fixture() -> TestFixture {
     trace.write_all(&fs::read(trace_path).unwrap()).unwrap();
 
     TestFixture {
-        job_trace: JobTrace {
-            job_hash: u64::default(),
+        job_trace: JobTrace::new(
+            kad::RecordKey::new(&[0]),
             air_public_input,
             air_private_input,
             memory,
             trace,
-        },
+        ),
     }
 }

@@ -1,4 +1,5 @@
 use crate::hash;
+use libp2p::kad;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
@@ -14,7 +15,7 @@ use std::{
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct JobWitness {
-    pub job_hash: u64,
+    pub job_key: kad::RecordKey,
     pub proof: Vec<u8>,
 }
 

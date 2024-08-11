@@ -1,18 +1,19 @@
 use futures::{stream::FuturesUnordered, Stream};
-use libp2p::{gossipsub, PeerId};
-use std::hash::{DefaultHasher, Hash, Hasher};
+use libp2p::{gossipsub, kad, PeerId};
+use std::collections::HashSet;
 use std::pin::Pin;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::{sync::mpsc::Sender, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tracing::{error, info};
+use zetina_common::job::Job;
 use zetina_common::{
-    graceful_shutdown::shutdown_signal, hash, job::JobBid, job_trace::JobTrace,
-    job_witness::JobWitness, process::Process,
+    graceful_shutdown::shutdown_signal, job::JobBid, job_trace::JobTrace, job_witness::JobWitness,
+    process::Process,
 };
 use zetina_peer::swarm::{
-    DelegationMessage, GossipsubMessage, MarketMessage, PeerBehaviourEvent, Topic,
+    DelegationMessage, GossipsubMessage, KademliaMessage, MarketMessage, PeerBehaviourEvent, Topic,
 };
 use zetina_prover::{
     errors::ProverControllerError, stone_prover::StoneProver, traits::ProverController,
@@ -30,6 +31,7 @@ impl Executor {
         identity: PeerId,
         mut swarm_events: Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + Send>>,
         gossipsub_tx: Sender<GossipsubMessage>,
+        kademlia_tx: Sender<KademliaMessage>,
         runner: CairoRunner,
         prover: StoneProver,
     ) -> Self {
@@ -41,6 +43,8 @@ impl Executor {
                     Process<'_, Result<JobWitness, ProverControllerError>>,
                 >::new();
 
+                let mut job_hash_store = HashSet::<kad::RecordKey>::new();
+
                 loop {
                     tokio::select! {
                         Some(event) = swarm_events.next() => {
@@ -48,13 +52,13 @@ impl Executor {
                                 PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message { message, .. }) => {
                                     if message.topic == Topic::Market.into() {
                                         match serde_json::from_slice::<MarketMessage>(&message.data)? {
-                                            MarketMessage::Job(job) => {
+                                            MarketMessage::JobBidPropagation(job_key) => {
                                                 gossipsub_tx
                                                     .send(GossipsubMessage {
                                                         topic: Topic::Market.into(),
                                                         data: serde_json::to_vec(&MarketMessage::JobBid(JobBid {
                                                             identity,
-                                                            job_hash: hash!(job),
+                                                            job_key,
                                                             price: (runner_scheduler.len() * prover_scheduler.len()) as u64,
                                                         }))?
                                                     })
@@ -67,23 +71,42 @@ impl Executor {
                                         match serde_json::from_slice::<DelegationMessage>(&message.data)? {
                                             DelegationMessage::Delegate(job_delegation) => {
                                                 if job_delegation.identity == identity {
-                                                    info!("Scheduled running of job: {}", hash!(job_delegation.job));
-                                                    runner_scheduler.push(runner.run(job_delegation.job)?);
+                                                    info!("received delegation of job: {}", hex::encode(&job_delegation.job_key));
+                                                    job_hash_store.insert(job_delegation.job_key.to_owned());
+                                                    kademlia_tx.send(KademliaMessage::GET(job_delegation.job_key)).await?;
                                                 }
                                             }
                                             _ => {}
                                         }
                                     }
                                 }
+                                PeerBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { result, ..}) => {
+                                    match result {
+                                        kad::QueryResult::GetRecord(Ok(
+                                            kad::GetRecordOk::FoundRecord(kad::PeerRecord {
+                                                record: kad::Record { key, value, .. },
+                                                ..
+                                            })
+                                        )) => {
+                                            if job_hash_store.contains(&key) {
+                                                let job: Job = serde_json::from_slice(&value)?;
+                                                info!("received delegation of job: {}", hex::encode(&key));
+                                                runner_scheduler.push(runner.run(job)?);
+                                                job_hash_store.remove(&key);
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
                                 _ => {}
                             }
                         }
                         Some(Ok(job_trace)) = runner_scheduler.next() => {
-                            info!("Scheduled proving of job_trace: {}", &job_trace.job_hash);
+                            info!("Scheduled proving of job_trace: {}", hex::encode(&job_trace.job_key));
                             prover_scheduler.push(prover.run(job_trace)?);
                         },
                         Some(Ok(job_witness)) = prover_scheduler.next() => {
-                            info!("Finished proving: {}", &job_witness.job_hash);
+                            info!("Finished proving: {}", hex::encode(&job_witness.job_key));
                             gossipsub_tx.send(GossipsubMessage {
                                 topic: Topic::Delegation.into(),
                                 data: serde_json::to_vec(&DelegationMessage::Finished(job_witness))?
@@ -120,8 +143,11 @@ pub enum Error {
     #[error("runner_controller_error")]
     RunnerControllerError(#[from] RunnerControllerError),
 
-    #[error("mpsc_send_error")]
-    MpscSendError(#[from] mpsc::error::SendError<GossipsubMessage>),
+    #[error("mpsc_send_error GossipsubMessage")]
+    MpscSendErrorGossipsubMessage(#[from] mpsc::error::SendError<GossipsubMessage>),
+
+    #[error("mpsc_send_error KademliaMessage")]
+    MpscSendErrorKademliaMessage(#[from] mpsc::error::SendError<KademliaMessage>),
 
     #[error("io")]
     Io(#[from] std::io::Error),

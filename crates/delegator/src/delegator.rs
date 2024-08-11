@@ -1,7 +1,7 @@
 use crate::bid_queue::{BidControllerError, BidQueue};
 use futures::stream::FuturesUnordered;
 use futures::Stream;
-use libp2p::{gossipsub, PeerId};
+use libp2p::{gossipsub, kad, PeerId};
 use starknet::signers::SigningKey;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -13,10 +13,10 @@ use tokio_stream::StreamExt;
 use tracing::{error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
 use zetina_common::hash;
-use zetina_common::job::{Job, JobData, JobDelegation};
+use zetina_common::job::{Job, JobBid, JobData};
 use zetina_common::process::Process;
 use zetina_peer::swarm::{
-    DelegationMessage, GossipsubMessage, MarketMessage, PeerBehaviourEvent, Topic,
+    DelegationMessage, GossipsubMessage, KademliaMessage, MarketMessage, PeerBehaviourEvent, Topic,
 };
 
 pub struct Delegator {
@@ -27,28 +27,28 @@ impl Delegator {
     pub fn new(
         mut swarm_events: Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + Send>>,
         gossipsub_tx: Sender<GossipsubMessage>,
+        kademlia_tx: Sender<KademliaMessage>,
         mut delegate_rx: mpsc::Receiver<JobData>,
-        events_tx: broadcast::Sender<(u64, DelegatorEvent)>,
+        events_tx: broadcast::Sender<(kad::RecordKey, DelegatorEvent)>,
         signing_key: SigningKey,
     ) -> Self {
         Self {
             handle: Some(tokio::spawn(async move {
                 let mut job_bid_scheduler = FuturesUnordered::<
-                    Process<Result<(Job, BTreeMap<u64, Vec<PeerId>>), BidControllerError>>,
+                    Process<
+                        Result<(kad::RecordKey, BTreeMap<u64, Vec<PeerId>>), BidControllerError>,
+                    >,
                 >::new();
-                let mut job_hash_store = HashMap::<u64, mpsc::Sender<(u64, PeerId)>>::new();
+                let mut job_hash_store =
+                    HashMap::<kad::RecordKey, mpsc::Sender<(u64, PeerId)>>::new();
                 loop {
                     tokio::select! {
                         Some(job_data) = delegate_rx.recv() => {
                             let job = Job::try_from_job_data(job_data, &signing_key);
-                            gossipsub_tx.send(GossipsubMessage {
-                                topic: Topic::Market.into(),
-                                data: serde_json::to_vec(&MarketMessage::Job(job.to_owned()))?
-                            }).await?;
-                            info!("Propagated job: {} for bidding", hash!(job));
-                            let (process, bid_tx) = BidQueue::run(job.to_owned());
-                            job_bid_scheduler.push(process);
-                            job_hash_store.insert(hash!(job), bid_tx);
+                            let job_key = kad::RecordKey::new(&hash!(job).to_be_bytes());
+                            kademlia_tx.send(KademliaMessage::PUT(
+                                (job_key, serde_json::to_vec(&job)?)
+                            )).await?;
                         },
                         Some(event) = swarm_events.next() => {
                             match event {
@@ -56,10 +56,10 @@ impl Delegator {
                                     if message.topic == Topic::Market.into() {
                                         match serde_json::from_slice::<MarketMessage>(&message.data)? {
                                             MarketMessage::JobBid(job_bid) => {
-                                                if let Some(bid_tx) =  job_hash_store.get_mut(&job_bid.job_hash) {
-                                                    info!("Received job bid: {} price: {} from: {}", job_bid.job_hash, job_bid.price, job_bid.identity);
+                                                if let Some(bid_tx) =  job_hash_store.get_mut(&job_bid.job_key) {
+                                                    info!("Received job bid: {} price: {} from: {}", hex::encode(&job_bid.job_key), job_bid.price, job_bid.identity);
                                                     bid_tx.send((job_bid.price, job_bid.identity)).await?;
-                                                    events_tx.send((job_bid.job_hash, DelegatorEvent::BidReceived(job_bid.identity)))?;
+                                                    events_tx.send((job_bid.job_key, DelegatorEvent::BidReceived(job_bid.identity)))?;
                                                 }
                                             }
                                             _ => {}
@@ -68,27 +68,42 @@ impl Delegator {
                                     if message.topic == Topic::Delegation.into() {
                                         match serde_json::from_slice::<DelegationMessage>(&message.data)? {
                                             DelegationMessage::Finished(job_witness) => {
-                                                info!("Received finished job: {}", job_witness.job_hash);
-                                                events_tx.send((job_witness.job_hash, DelegatorEvent::Finished(job_witness.proof)))?;
+                                                info!("Received finished job: {}", hex::encode(&job_witness.job_key));
+                                                events_tx.send((job_witness.job_key, DelegatorEvent::Finished(job_witness.proof)))?;
                                             }
                                             _ => {}
                                         }
+                                    }
+                                },
+                                PeerBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { result, ..}) => {
+                                    match result {
+                                        kad::QueryResult::PutRecord(Ok(kad::PutRecordOk { key })) => {
+                                            gossipsub_tx.send(GossipsubMessage {
+                                                topic: Topic::Market.into(),
+                                                data: serde_json::to_vec(&MarketMessage::JobBidPropagation(key.to_owned()))?
+                                            }).await?;
+                                            info!("Propagated job: {} for bidding", hex::encode(&key));
+                                            let (process, bid_tx) = BidQueue::run(key.to_owned());
+                                            job_bid_scheduler.push(process);
+                                            job_hash_store.insert(key, bid_tx);
+                                        }
+                                        _ => {}
                                     }
                                 }
                                 _ => {}
                             }
                         }
-                        Some(Ok((job, bids))) = job_bid_scheduler.next() => {
-                            job_hash_store.remove(&hash!(job));
+                        Some(Ok((job_key, bids))) = job_bid_scheduler.next() => {
+                            job_hash_store.remove(&job_key);
                             let bid = bids.first_key_value().unwrap();
                             let price = *bid.0;
                             let identity = *bid.1.first().unwrap();
-                            info!("Job {} delegated to best bidder: {}", hash!(job), identity);
+                            info!("Job {} delegated to best bidder: {}", hex::encode(&job_key), identity);
                             gossipsub_tx.send(GossipsubMessage {
                                 topic: Topic::Delegation.into(),
-                                data: serde_json::to_vec(&DelegationMessage::Delegate(JobDelegation{identity, job: job.to_owned(), price}))?
+                                data: serde_json::to_vec(&DelegationMessage::Delegate(JobBid{identity, job_key: job_key.to_owned(), price}))?
                             }).await?;
-                            events_tx.send((hash!(job), DelegatorEvent::Delegated(identity)))?;
+                            events_tx.send((job_key, DelegatorEvent::Delegated(identity)))?;
                         }
                         _ = shutdown_signal() => {
                             break
@@ -125,8 +140,13 @@ pub enum Error {
     #[error("mpsc_send_error GossipsubMessage")]
     MpscSendErrorGossipsubMessage(#[from] mpsc::error::SendError<GossipsubMessage>),
 
+    #[error("mpsc_send_error KademliaMessage")]
+    MpscSendErrorKademliaMessage(#[from] mpsc::error::SendError<KademliaMessage>),
+
     #[error("mpsc_send_error DelegatorEvent")]
-    BreadcastSendErrorDelegatorEvent(#[from] broadcast::error::SendError<(u64, DelegatorEvent)>),
+    BreadcastSendErrorDelegatorEvent(
+        #[from] broadcast::error::SendError<(kad::RecordKey, DelegatorEvent)>,
+    ),
 
     #[error("mpsc_send_error JobBid")]
     MpscSendErrorJobBid(#[from] mpsc::error::SendError<(u64, PeerId)>),
