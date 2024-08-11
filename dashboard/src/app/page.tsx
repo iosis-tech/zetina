@@ -16,14 +16,18 @@ import {
   DelegateRequest,
   DelegateResponse,
   JobEventsResponse,
+  PeerId,
   Proof,
 } from "./api";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import subscribeEvents from "./subscribeEvents";
-import assert from "assert";
+import { WorkerMessage, WorkerResponse } from "@/utils/types";
+import { matchCommitment, matchLayout } from "@/utils/loadModule";
 
 const steps = [
   "Job propagated to network",
+  "Job bidding",
+  "Job delegated",
   "Proof received",
 ];
 
@@ -80,13 +84,67 @@ function QontoStepIcon(props: StepIconProps) {
   );
 }
 
+
 export default function Home() {
+  const workerRef = useRef<Worker>();
   const darkTheme = createTheme({
     palette: {
       mode: "dark",
       primary: { main: "#784af4", dark: "#784af4" },
     },
   });
+
+  // Function to add a new log entry
+  const addLog = (message: string) => {
+    const now = new Date();
+    const timestamp = now.toLocaleString(); // Get current date and time as a string
+    const logEntry = (
+      <div key={logs.length}>
+        LOG: {timestamp} - {message}
+      </div>
+    );
+    setLogs((prevLogs) => [...prevLogs, logEntry]);
+  };
+
+  const verifyProof = async (proof: string) => {
+    const parsedProof = JSON.parse(proof);
+
+    const layout = matchLayout(parsedProof.public_input.layout);
+    const commitment = matchCommitment(parsedProof.proof_parameters.pow_hash);
+
+    workerRef.current = new Worker(new URL("../worker.ts", import.meta.url), {
+      type: "module",
+    });
+
+    workerRef.current.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      const { programHash, programOutput, error } = event.data;
+
+      if (error) {
+        console.error(error);
+        addLog("Verification Failed");
+        setButtonColor("error");
+      } else {
+        addLog(`programHash: ${programHash}`);
+        addLog(`programOutput: ${programOutput}`);
+        addLog(`layout: ${layout}`);
+        addLog(`commitment: ${commitment}`);
+        addLog("Proof Verified");
+        setButtonColor("success");
+      }
+
+      workerRef.current?.terminate();
+    };
+
+    if (layout && commitment) {
+      const message: WorkerMessage = {
+        proof,
+        layout,
+        commitment,
+      };
+
+      workerRef.current.postMessage(message);
+    }
+  };
 
   const ondrop = <T extends File>(
     acceptedFiles: T[],
@@ -103,8 +161,6 @@ export default function Home() {
         const requestBody: DelegateRequest = DelegateRequest.parse({
           pie: Array.from(fileBytes),
         });
-
-        console.log(requestBody);
 
         let subscriber: EventSource | null = null;
 
@@ -127,25 +183,36 @@ export default function Home() {
           const data: DelegateResponse = DelegateResponse.parse(
             await response.json(),
           );
-          console.log("Job hash:", data.job_hash);
-
+          addLog(`Job ${data.job_key} sent to the p2p network`)
           setActiveStep(1);
-          setIsProcessing(data.job_hash);
+          setIsProcessing(data.job_key);
 
           subscriber = subscribeEvents(
             `${process.env.NEXT_PUBLIC_API_URL}/job_events`,
-            `job_hash=${data.job_hash.toString()}`,
-            (event) => {
+            `job_key=${data.job_key.toString()}`,
+            async (event) => {
               let job_event = JobEventsResponse.parse(event);
+              if (job_event.type == "BidReceived") {
+                let peer_id = PeerId.parse(job_event.data);
+                addLog(`Recived bid for job ${data.job_key} from peer ${peer_id}`)
+                setActiveStep(2);
+              }
+              if (job_event.type == "Delegated") {
+                let peer_id = PeerId.parse(job_event.data);
+                addLog(`Job ${data.job_key} delegated to peer ${peer_id}`)
+                setActiveStep(3);
+              }
               if (job_event.type == "Finished") {
                 let proof = Proof.parse(job_event.data);
-                setActiveStep(3);
+                addLog(`Job ${data.job_key} proof received`)
+                setActiveStep(4);
                 setDownloadBlob([
                   new Blob([new Uint8Array(proof)]),
-                  `${data.job_hash}_proof.json`,
+                  `${data.job_key}_proof.json`,
                 ]);
                 setIsProcessing(null);
                 subscriber?.close();
+                await verifyProof(new TextDecoder().decode(new Uint8Array(job_event.data)))
               }
             },
           );
@@ -160,13 +227,31 @@ export default function Home() {
     reader.readAsArrayBuffer(file);
   };
 
-  const [isProcessing, setIsProcessing] = useState<bigint | null>(null);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [logs, setLogs] = useState<JSX.Element[]>([]);
   const [activeStep, setActiveStep] = useState<number>(0);
   const [downloadBlob, setDownloadBlob] = useState<[Blob, string] | null>(null);
+  const [buttonColor, setButtonColor] = useState<
+    | "inherit"
+    | "primary"
+    | "secondary"
+    | "success"
+    | "error"
+    | "info"
+    | "warning"
+  >("primary");
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: ondrop,
   });
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [logs]);
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -213,10 +298,16 @@ export default function Home() {
                 </Step>
               ))}
             </Stepper>
+            <div ref={scrollContainerRef} className="scroll-container p-1 px-4 border-2 border-gray-800 rounded-2xl backdrop-blur-md h-20 overflow-y-scroll text-sm text-wrap break-words text-gray-500">
+              {logs.map((log, index) => (
+                <div key={index}>{log}</div>
+              ))}
+            </div>
             <div className="grid justify-center items-center">
               <Button
                 variant="outlined"
                 size="large"
+                color={buttonColor}
                 disabled={downloadBlob == null}
                 onClick={() => {
                   if (downloadBlob != null) {

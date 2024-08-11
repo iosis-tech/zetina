@@ -3,8 +3,8 @@ use futures::stream::Stream;
 use libp2p::futures::StreamExt;
 use libp2p::gossipsub::{self, IdentTopic, TopicHash};
 use libp2p::identity::Keypair;
-use libp2p::kad::store::MemoryStore;
-use libp2p::kad::Mode;
+use libp2p::kad::store::{MemoryStore, MemoryStoreConfig};
+use libp2p::kad::{Config, Mode};
 use libp2p::swarm::{DialError, NetworkBehaviour, SwarmEvent};
 use libp2p::{kad, noise, tcp, yamux, Multiaddr, Swarm, SwarmBuilder};
 use serde::{Deserialize, Serialize};
@@ -92,6 +92,8 @@ impl SwarmRunner {
         p2p_keypair: Keypair,
         p2p_multiaddr: Multiaddr,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut config = Config::default();
+        config.set_max_packet_size(1024*1024*100);
         let mut swarm = SwarmBuilder::with_existing_identity(p2p_keypair)
             .with_tokio()
             .with_tcp(
@@ -101,13 +103,20 @@ impl SwarmRunner {
             )?
             .with_quic()
             .with_behaviour(|p2p_keypair| PeerBehaviour {
-                kademlia: kad::Behaviour::new(
+                kademlia: kad::Behaviour::with_config(
                     p2p_keypair.public().to_peer_id(),
-                    MemoryStore::new(p2p_keypair.public().to_peer_id()),
+                    MemoryStore::with_config(
+                        p2p_keypair.public().to_peer_id(),
+                        MemoryStoreConfig { 
+                            max_value_bytes: 1024*1024*100,
+                            ..Default::default()
+                        },
+                    ),
+                    config
                 ),
                 gossipsub: Self::init_gossip(p2p_keypair).unwrap(),
             })?
-            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(10)))
             .build();
 
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Networking.as_str()))?;
@@ -163,7 +172,7 @@ impl SwarmRunner {
                                 let record = kad::Record {
                                     key: kad::RecordKey::new(&key),
                                     value: data,
-                                    publisher: Some(*self.swarm.local_peer_id()),
+                                    publisher: None,
                                     expires: None,
                                 };
                                 if let Err(e) = self.swarm.behaviour_mut().kademlia.put_record(record, kad::Quorum::One) {

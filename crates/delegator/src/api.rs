@@ -6,7 +6,7 @@ use axum::{
 };
 use futures::StreamExt;
 use hyper::StatusCode;
-use libp2p::{kad, PeerId};
+use libp2p::kad;
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::{io, time::Duration};
@@ -39,7 +39,7 @@ pub struct DelegateRequest {
 
 #[derive(Debug, Serialize)]
 pub struct DelegateResponse {
-    job_hash: kad::RecordKey,
+    job_key: String,
 }
 
 pub async fn deletage_handler(
@@ -49,19 +49,19 @@ pub async fn deletage_handler(
     let job_data = JobData::new(input.pie);
     let job_data_hash = kad::RecordKey::new(&hash!(job_data).to_be_bytes());
     state.delegate_tx.send(job_data).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(DelegateResponse { job_hash: job_data_hash }))
+    Ok(Json(DelegateResponse { job_key: hex::encode(job_data_hash) }))
 }
 
 #[derive(Debug, Deserialize)]
 pub struct JobEventsRequest {
-    job_hash: kad::RecordKey,
+    job_key: String,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", content = "data")]
 pub enum JobEventsResponse {
-    BidReceived(PeerId),
-    Delegated(PeerId),
+    BidReceived(String),
+    Delegated(String),
     Finished(Vec<u8>),
 }
 
@@ -70,16 +70,19 @@ pub async fn job_events_handler(
     Query(input): Query<JobEventsRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, io::Error>>> {
     let stream = stream! {
-        let job_hash = input.job_hash;
+        let job_key =  kad::RecordKey::new(
+            &hex::decode(input.job_key)
+            .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e.to_string()))?
+        );
         loop {
             tokio::select! {
-                Ok((hash, event)) = state.events_rx.recv() => {
-                    if hash == job_hash {
+                Ok((key, event)) = state.events_rx.recv() => {
+                    if key == job_key {
                         yield Event::default()
                             .json_data(
                                 match event {
-                                    DelegatorEvent::BidReceived(peer_id) => { JobEventsResponse::BidReceived(peer_id) },
-                                    DelegatorEvent::Delegated(peer_id) => { JobEventsResponse::Delegated(peer_id) },
+                                    DelegatorEvent::BidReceived(peer_id) => { JobEventsResponse::BidReceived(peer_id.to_base58()) },
+                                    DelegatorEvent::Delegated(peer_id) => { JobEventsResponse::Delegated(peer_id.to_base58()) },
                                     DelegatorEvent::Finished(data) => { JobEventsResponse::Finished(data) },
                                 }
                             )
