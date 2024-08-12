@@ -93,7 +93,7 @@ impl SwarmRunner {
         p2p_multiaddr: Multiaddr,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut config = Config::default();
-        config.set_max_packet_size(1024*1024*100);
+        config.set_max_packet_size(1024 * 1024 * 100);
         let mut swarm = SwarmBuilder::with_existing_identity(p2p_keypair)
             .with_tokio()
             .with_tcp(
@@ -107,12 +107,12 @@ impl SwarmRunner {
                     p2p_keypair.public().to_peer_id(),
                     MemoryStore::with_config(
                         p2p_keypair.public().to_peer_id(),
-                        MemoryStoreConfig { 
-                            max_value_bytes: 1024*1024*100,
+                        MemoryStoreConfig {
+                            max_value_bytes: 1024 * 1024 * 100,
                             ..Default::default()
                         },
                     ),
-                    config
+                    config,
                 ),
                 gossipsub: Self::init_gossip(p2p_keypair).unwrap(),
             })?
