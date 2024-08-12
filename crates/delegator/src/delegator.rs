@@ -14,6 +14,7 @@ use tracing::{error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
 use zetina_common::hash;
 use zetina_common::job::{Job, JobBid, JobData};
+use zetina_common::job_witness::JobWitness;
 use zetina_common::process::Process;
 use zetina_peer::swarm::{
     DelegationMessage, GossipsubMessage, KademliaMessage, MarketMessage, PeerBehaviourEvent, Topic,
@@ -41,6 +42,8 @@ impl Delegator {
                 >::new();
                 let mut job_hash_store =
                     HashMap::<kad::RecordKey, mpsc::Sender<(u64, PeerId)>>::new();
+                let mut proof_hash_store = HashMap::<kad::RecordKey, kad::RecordKey>::new();
+
                 loop {
                     tokio::select! {
                         Some(job_data) = delegate_rx.recv() => {
@@ -67,9 +70,12 @@ impl Delegator {
                                     }
                                     if message.topic == Topic::Delegation.into() {
                                         match serde_json::from_slice::<DelegationMessage>(&message.data)? {
-                                            DelegationMessage::Finished(job_witness) => {
-                                                info!("Received finished job: {}", hex::encode(&job_witness.job_key));
-                                                events_tx.send((job_witness.job_key, DelegatorEvent::Finished(job_witness.proof)))?;
+                                            DelegationMessage::Finished(proof_key, job_key) => {
+                                                if job_hash_store.remove(&job_key).is_some() {
+                                                    info!("Received finished job: {} proof key: {}", hex::encode(&job_key), hex::encode(&proof_key));
+                                                    proof_hash_store.insert(proof_key.to_owned(), job_key);
+                                                    kademlia_tx.send(KademliaMessage::GET(proof_key)).await?;
+                                                }
                                             }
                                             _ => {}
                                         }
@@ -86,7 +92,19 @@ impl Delegator {
                                             let (process, bid_tx) = BidQueue::run(key.to_owned());
                                             job_bid_scheduler.push(process);
                                             job_hash_store.insert(key, bid_tx);
-                                        }
+                                        },
+                                        kad::QueryResult::GetRecord(Ok(
+                                            kad::GetRecordOk::FoundRecord(kad::PeerRecord {
+                                                record: kad::Record { key, value, .. },
+                                                ..
+                                            })
+                                        )) => {
+                                            if let Some ((proof_key, job_key)) = proof_hash_store.remove_entry(&key) {
+                                                info!("job {} proof with key: {} returned in DHT", hex::encode(&job_key), hex::encode(&proof_key));
+                                                let job_witness: JobWitness = serde_json::from_slice(&value)?;
+                                                events_tx.send((job_key, DelegatorEvent::Finished(job_witness.proof)))?;
+                                            }
+                                        },
                                         _ => {}
                                     }
                                 }
@@ -94,7 +112,6 @@ impl Delegator {
                             }
                         }
                         Some(Ok((job_key, bids))) = job_bid_scheduler.next() => {
-                            job_hash_store.remove(&job_key);
                             let bid = bids.first_key_value().unwrap();
                             let price = *bid.0;
                             let identity = *bid.1.first().unwrap();

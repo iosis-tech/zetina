@@ -1,12 +1,14 @@
 use futures::{stream::FuturesUnordered, Stream};
 use libp2p::{gossipsub, kad, PeerId};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::pin::Pin;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::{sync::mpsc::Sender, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tracing::{error, info};
+use zetina_common::hash;
 use zetina_common::job::Job;
 use zetina_common::{
     graceful_shutdown::shutdown_signal, job::JobBid, job_trace::JobTrace, job_witness::JobWitness,
@@ -44,6 +46,7 @@ impl Executor {
                 >::new();
 
                 let mut job_hash_store = HashSet::<kad::RecordKey>::new();
+                let mut proof_hash_store = HashMap::<kad::RecordKey, kad::RecordKey>::new();
 
                 loop {
                     tokio::select! {
@@ -88,11 +91,19 @@ impl Executor {
                                                 ..
                                             })
                                         )) => {
-                                            if job_hash_store.contains(&key) {
+                                            if job_hash_store.remove(&key) {
                                                 let job: Job = serde_json::from_slice(&value)?;
                                                 info!("received delegation of job: {}", hex::encode(&key));
                                                 runner_scheduler.push(runner.run(job)?);
-                                                job_hash_store.remove(&key);
+                                            }
+                                        },
+                                        kad::QueryResult::PutRecord(Ok(kad::PutRecordOk { key })) => {
+                                            if let Some ((proof_key, job_key)) = proof_hash_store.remove_entry(&key) {
+                                                info!("job {} proof with key: {} stored in DHT", hex::encode(&job_key), hex::encode(&proof_key));
+                                                gossipsub_tx.send(GossipsubMessage {
+                                                    topic: Topic::Delegation.into(),
+                                                    data: serde_json::to_vec(&DelegationMessage::Finished(proof_key, job_key))?
+                                                }).await?;
                                             }
                                         }
                                         _ => {}
@@ -106,11 +117,12 @@ impl Executor {
                             prover_scheduler.push(prover.run(job_trace)?);
                         },
                         Some(Ok(job_witness)) = prover_scheduler.next() => {
-                            info!("Finished proving: {}", hex::encode(&job_witness.job_key));
-                            gossipsub_tx.send(GossipsubMessage {
-                                topic: Topic::Delegation.into(),
-                                data: serde_json::to_vec(&DelegationMessage::Finished(job_witness))?
-                            }).await?;
+                            let proof_key = kad::RecordKey::new(&hash!(job_witness).to_be_bytes());
+                            info!("Finished proving job: {} proof key: {}", hex::encode(&job_witness.job_key), hex::encode(&proof_key));
+                            proof_hash_store.insert(proof_key.to_owned(), job_witness.job_key.to_owned());
+                            kademlia_tx.send(KademliaMessage::PUT(
+                                (proof_key, serde_json::to_vec(&job_witness)?)
+                            )).await?;
                         },
                         _ = shutdown_signal() => {
                             break

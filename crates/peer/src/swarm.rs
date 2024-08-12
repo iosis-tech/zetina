@@ -14,7 +14,6 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
 use zetina_common::job::{Job, JobBid};
-use zetina_common::job_witness::JobWitness;
 
 #[derive(NetworkBehaviour)]
 pub struct PeerBehaviour {
@@ -83,7 +82,7 @@ pub enum MarketMessage {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum DelegationMessage {
     Delegate(JobBid),
-    Finished(JobWitness),
+    Finished(kad::RecordKey, kad::RecordKey),
 }
 
 impl SwarmRunner {
