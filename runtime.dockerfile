@@ -2,7 +2,7 @@
 FROM zetina-stone-prover AS zetina-stone-prover
 
 # Stage 2: Use a Debian-based Linux distribution as the base image
-FROM --platform=linux/amd64 debian:stable-slim
+FROM debian:stable-slim
 
 # Set the default shell to bash
 SHELL ["/bin/bash", "-ci"]

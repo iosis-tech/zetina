@@ -12,7 +12,6 @@ members = [
     "crates/prover",
     "crates/runner",
     "crates/tests",
-
 ]
 exclude = []
 
@@ -47,6 +46,7 @@ libp2p = { version = "0.53.2", features = [
     "tcp",
     "yamux",
     "quic",
+    "serde",
 ] }
 num-bigint = "0.4.4"
 proptest = "1.4.0"

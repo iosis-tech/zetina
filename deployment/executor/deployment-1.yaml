@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: executor-1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: executor-1
+  template:
+    metadata:
+      labels:
+        app: executor-1
+    spec:
+      containers:
+      - name: executor-1
+        image: registry.internal.iosis.tech/zetina-executor:latest
+        args: ["bash", "-ci", "cargo run --release --bin zetina-executor -- -l /ip4/0.0.0.0/tcp/5679 -p $(PRIVATE_KEY) -a $(ADDRESS)"]
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "4"
+            memory: "10Gi"
+        env:
+        - name: RUST_LOG
+          valueFrom:
+            configMapKeyRef:
+              name: zetina-config
+              key: RUST_LOG
+        - name: CAIRO_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: zetina-config
+              key: CAIRO_PATH
+        - name: BOOTLOADER_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: zetina-config
+              key: BOOTLOADER_PATH
+        - name: BOOTLOADER_OUT_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: zetina-config
+              key: BOOTLOADER_OUT_NAME
+        - name: PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: zetina-secret
+              key: PRIVATE_KEY_1
+        - name: ADDRESS
+          valueFrom:
+            secretKeyRef:
+              name: zetina-secret
+              key: ADDRESS_1
+        ports:
+        - containerPort: 3000
+        - containerPort: 5678
+        - containerPort: 5679
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: executor-1-service
+  annotations:
+    kube-vip.io/loadbalancerIPs: "0.0.0.0"
+    kube-vip.io/hwaddr: "00:00:6C:32:98:82"
+    kube-vip.io/loadbalancerHostname: "zetina-executor-1"
+spec:
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: api-port
+  - port: 5678
+    targetPort: 5678
+    protocol: UDP
+    name: p2p-quic-port
+  - port: 5679
+    targetPort: 5679
+    protocol: TCP
+    name: p2p-tcp-port
+  selector:
+    app: executor-1
+  type: LoadBalancer

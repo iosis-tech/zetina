@@ -1,5 +1,6 @@
 use crate::hash;
 use cairo_vm::vm::runners::cairo_pie::CairoPie;
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use starknet::signers::{SigningKey, VerifyingKey};
 use starknet_crypto::{poseidon_hash_many, FieldElement, Signature};
@@ -44,16 +45,13 @@ impl Job {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct JobData {
-    pub reward: u64,
-    pub num_of_steps: u64,
     #[serde(with = "chunk_felt_array")]
     pub cairo_pie_compressed: Vec<u8>,
 }
 
 impl JobData {
-    pub fn new(reward: u64, cairo_pie_compressed: Vec<u8>) -> Self {
-        let pie = Self::decompress_cairo_pie(&cairo_pie_compressed);
-        Self { reward, num_of_steps: pie.execution_resources.n_steps as u64, cairo_pie_compressed }
+    pub fn new(cairo_pie_compressed: Vec<u8>) -> Self {
+        Self { cairo_pie_compressed }
     }
 
     fn decompress_cairo_pie(cairo_pie_compressed: &[u8]) -> CairoPie {
@@ -87,8 +85,6 @@ impl JobData {
 
 impl Hash for JobData {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.reward.hash(state);
-        self.num_of_steps.hash(state);
         self.cairo_pie_compressed.hash(state);
     }
 }
@@ -103,6 +99,20 @@ impl Display for Job {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", hex::encode(hash!(self).to_be_bytes()))
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct JobBid {
+    pub identity: PeerId,
+    pub job_hash: u64,
+    pub price: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct JobDelegation {
+    pub identity: PeerId,
+    pub job: Job,
+    pub price: u64,
 }
 
 mod chunk_felt_array {

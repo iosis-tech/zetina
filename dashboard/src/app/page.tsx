@@ -16,7 +16,6 @@ import {
   DelegateRequest,
   DelegateResponse,
   JobEventsResponse,
-  JobHash,
   Proof,
 } from "./api";
 import { useState } from "react";
@@ -25,8 +24,7 @@ import assert from "assert";
 
 const steps = [
   "Job propagated to network",
-  "Job picked by executor",
-  "JobWitness received",
+  "Proof received",
 ];
 
 const QontoConnector = styled(StepConnector)(({ theme }) => ({
@@ -103,7 +101,7 @@ export default function Home() {
         const fileBytes = new Uint8Array(e.target.result as ArrayBuffer);
         console.log(Array.from(fileBytes));
         const requestBody: DelegateRequest = DelegateRequest.parse({
-          trace: Array.from(fileBytes),
+          pie: Array.from(fileBytes),
         });
 
         console.log(requestBody);
@@ -139,12 +137,7 @@ export default function Home() {
             `job_hash=${data.job_hash.toString()}`,
             (event) => {
               let job_event = JobEventsResponse.parse(event);
-              if (job_event.type == "Picked") {
-                let job_hash = JobHash.parse(job_event.data);
-                assert(job_hash == data.job_hash);
-                setActiveStep(2);
-              }
-              if (job_event.type == "Witness") {
+              if (job_event.type == "Finished") {
                 let proof = Proof.parse(job_event.data);
                 setActiveStep(3);
                 setDownloadBlob([
@@ -181,8 +174,8 @@ export default function Home() {
         <main className="flex-1 grid justify-center items-center">
           <div className="p-10 border-2 border-gray-800 rounded-2xl backdrop-blur-md grid grid-flow-row gap-8 w-[800px]">
             <div className="text-center font-medium grid grid-flow-row gap-1">
-              <div className="text-xl font-bold">ZK prover network</div>
-              <div className="text-md">Prove program Trace</div>
+              <div className="text-xl font-bold">Zetina network</div>
+              <div className="text-md">Prove program Pie</div>
             </div>
             <div
               className="cursor-pointer p-10 border-2 rounded-2xl border-dashed border-gray-800 hover:bg"
@@ -194,10 +187,10 @@ export default function Home() {
                   Processing job: {isProcessing.toString()}
                 </p>
               ) : isDragActive ? (
-                <p className="text-center">Drop the Trace here ...</p>
+                <p className="text-center">Drop the Pie here ...</p>
               ) : (
                 <p className="text-center">
-                  Drag Trace here, or click to select files
+                  Drag Pie here, or click to select files
                 </p>
               )}
             </div>

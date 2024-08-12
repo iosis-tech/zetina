@@ -58,8 +58,6 @@ class FieldElementsData:
 
 @dataclasses.dataclass(frozen=True)
 class JobData(Task):
-    reward: int
-    num_of_steps: int
     cairo_pie_compressed: FieldElementsData
 
     def load_task(self) -> "CairoPieTask":

@@ -1,21 +1,17 @@
+pub mod api;
 pub mod executor;
-pub mod swarm;
 
-use axum::Router;
+use axum::{routing::get, Router};
 use clap::Parser;
 use executor::Executor;
-use libp2p::gossipsub;
-use std::time::Duration;
-use swarm::SwarmRunner;
+use libp2p::Multiaddr;
+use starknet::{core::types::FieldElement, signers::SigningKey};
+use std::{str::FromStr, time::Duration};
 use tokio::{net::TcpListener, sync::mpsc};
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing_subscriber::EnvFilter;
-use zetina_common::{
-    graceful_shutdown::shutdown_signal,
-    network::Network,
-    node_account::NodeAccount,
-    topic::{gossipsub_ident_topic, Topic},
-};
+use zetina_common::graceful_shutdown::shutdown_signal;
+use zetina_peer::swarm::{GossipsubMessage, SwarmRunner};
 use zetina_prover::stone_prover::StoneProver;
 use zetina_runner::cairo_runner::CairoRunner;
 
@@ -24,6 +20,12 @@ struct Cli {
     /// The private key as a hex string
     #[arg(short, long)]
     private_key: String,
+
+    #[arg(short, long)]
+    listen_address: String,
+
+    #[arg(short, long)]
+    address: String,
 
     #[arg(short, long)]
     dial_addresses: Vec<String>,
@@ -36,51 +38,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command line arguments
     let cli = Cli::parse();
 
+    // TODO: common setup in node initiate binary
+    let private_key = hex::decode(cli.private_key)?;
+    let secret_key = libp2p::identity::ecdsa::SecretKey::try_from_bytes(private_key.as_slice())?;
+    let p2p_keypair =
+        libp2p::identity::Keypair::from(libp2p::identity::ecdsa::Keypair::from(secret_key));
+
+    let identity = p2p_keypair.public().to_peer_id();
+
+    let signing_key = SigningKey::from_secret_scalar(
+        FieldElement::from_byte_slice_be(private_key.as_slice()).unwrap(),
+    );
+
     let ws_root = std::path::PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env not present"),
     )
     .join("../../");
     let bootloader_program_path = ws_root.join("target/bootloader.json");
 
-    // TODO: common setup in node initiate binary
-    let network = Network::Sepolia;
-    let private_key = hex::decode(cli.private_key)?;
-
-    let node_account = NodeAccount::new(private_key);
-
-    // Generate topic
-    let new_job_topic = gossipsub_ident_topic(network, Topic::NewJob);
-    let picked_job_topic = gossipsub_ident_topic(network, Topic::PickedJob);
-    let finished_job_topic = gossipsub_ident_topic(network, Topic::FinishedJob);
-
-    let (swarm_events_tx, swarm_events_rx) = mpsc::channel::<gossipsub::Event>(100);
-    let (picked_job_topic_tx, picked_job_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
-    let (finished_job_topic_tx, finished_job_topic_rx) = mpsc::channel::<Vec<u8>>(1000);
-
-    SwarmRunner::new(
-        cli.dial_addresses,
-        node_account.get_keypair(),
-        vec![new_job_topic, picked_job_topic.to_owned(), finished_job_topic.to_owned()],
-        vec![
-            (picked_job_topic.to_owned(), picked_job_topic_rx),
-            (finished_job_topic, finished_job_topic_rx),
-        ],
-        swarm_events_tx,
+    let mut swarm_runner = SwarmRunner::new(
+        cli.listen_address.parse()?,
+        p2p_keypair,
+        Multiaddr::from_str(&cli.address).unwrap(),
     )?;
 
-    let verifying_key = node_account.get_verifying_key();
-    let runner = CairoRunner::new(bootloader_program_path, verifying_key);
+    cli.dial_addresses
+        .into_iter()
+        .try_for_each(|addr| swarm_runner.swarm.dial(Multiaddr::from_str(&addr).unwrap()))
+        .unwrap();
+
+    let (gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
+    let swarm_events = swarm_runner.run(gossipsub_rx);
+
+    let runner = CairoRunner::new(bootloader_program_path, signing_key.verifying_key());
     let prover = StoneProver::new();
 
-    Executor::new(swarm_events_rx, finished_job_topic_tx, picked_job_topic_tx, runner, prover);
+    Executor::new(identity, swarm_events, gossipsub_tx, runner, prover);
 
     // Create a `TcpListener` using tokio.
-    let listener = TcpListener::bind("0.0.0.0:3010").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
 
     // Run the server with graceful shutdown
     axum::serve(
         listener,
-        Router::new().layer((
+        Router::new().route("/health", get(api::health_check_handler)).layer((
             TraceLayer::new_for_http(),
             // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
             // requests don't hang forever.

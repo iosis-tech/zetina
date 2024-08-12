@@ -1,44 +1,40 @@
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
-use libp2p::gossipsub::Event;
+use futures::{stream::FuturesUnordered, Stream};
+use libp2p::{gossipsub, PeerId};
 use std::hash::{DefaultHasher, Hash, Hasher};
-use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::info;
+use std::pin::Pin;
+use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio::{sync::mpsc::Sender, task::JoinHandle};
+use tokio_stream::StreamExt;
+use tracing::{error, info};
 use zetina_common::{
-    graceful_shutdown::shutdown_signal,
-    hash,
-    job::Job,
-    job_record::JobRecord,
-    job_trace::JobTrace,
-    job_witness::JobWitness,
-    network::Network,
-    process::Process,
-    topic::{gossipsub_ident_topic, Topic},
+    graceful_shutdown::shutdown_signal, hash, job::JobBid, job_trace::JobTrace,
+    job_witness::JobWitness, process::Process,
 };
-use zetina_prover::errors::ProverControllerError;
-use zetina_prover::stone_prover::StoneProver;
-use zetina_prover::traits::ProverController;
-use zetina_runner::cairo_runner::CairoRunner;
-use zetina_runner::errors::RunnerControllerError;
-use zetina_runner::traits::RunnerController;
-
-const MAX_PARALLEL_JOBS: usize = 1;
+use zetina_peer::swarm::{
+    DelegationMessage, GossipsubMessage, MarketMessage, PeerBehaviourEvent, Topic,
+};
+use zetina_prover::{
+    errors::ProverControllerError, stone_prover::StoneProver, traits::ProverController,
+};
+use zetina_runner::{
+    cairo_runner::CairoRunner, errors::RunnerControllerError, traits::RunnerController,
+};
 
 pub struct Executor {
-    handle: Option<JoinHandle<Result<(), ExecutorError>>>,
+    handle: Option<JoinHandle<Result<(), Error>>>,
 }
 
 impl Executor {
     pub fn new(
-        mut events_rx: mpsc::Receiver<Event>,
-        finished_job_topic_tx: mpsc::Sender<Vec<u8>>,
-        picked_job_topic_tx: mpsc::Sender<Vec<u8>>,
+        identity: PeerId,
+        mut swarm_events: Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + Send>>,
+        gossipsub_tx: Sender<GossipsubMessage>,
         runner: CairoRunner,
         prover: StoneProver,
     ) -> Self {
         Self {
             handle: Some(tokio::spawn(async move {
-                let mut job_record = JobRecord::<Job>::new();
                 let mut runner_scheduler =
                     FuturesUnordered::<Process<'_, Result<JobTrace, RunnerControllerError>>>::new();
                 let mut prover_scheduler = FuturesUnordered::<
@@ -47,111 +43,57 @@ impl Executor {
 
                 loop {
                     tokio::select! {
-                        Some(event) = events_rx.recv() => {
+                        Some(event) = swarm_events.next() => {
                             match event {
-                                Event::Message { message, .. } => {
-                                    // Received a new-job message from the network
-                                    if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::NewJob).into() {
-                                        let job: Job = serde_json::from_slice(&message.data)?;
-                                        info!("Received a new job event: {}", hash!(&job));
-                                        job_record.register_job(job);
-
+                                PeerBehaviourEvent::Gossipsub(gossipsub::Event::Message { message, .. }) => {
+                                    if message.topic == Topic::Market.into() {
+                                        match serde_json::from_slice::<MarketMessage>(&message.data)? {
+                                            MarketMessage::Job(job) => {
+                                                gossipsub_tx
+                                                    .send(GossipsubMessage {
+                                                        topic: Topic::Market.into(),
+                                                        data: serde_json::to_vec(&MarketMessage::JobBid(JobBid {
+                                                            identity,
+                                                            job_hash: hash!(job),
+                                                            price: (runner_scheduler.len() * prover_scheduler.len()) as u64,
+                                                        }))?
+                                                    })
+                                                    .await?
+                                            }
+                                            _ => {}
+                                        }
                                     }
-                                    // Received a picked-job message from the network
-                                    if message.topic ==  gossipsub_ident_topic(Network::Sepolia, Topic::PickedJob).into() {
-                                        let job: Job = serde_json::from_slice(&message.data)?;
-                                        info!("Received picked job event: {}", hash!(&job));
-                                        job_record.remove_job(&job);
+                                    if message.topic == Topic::Delegation.into() {
+                                        match serde_json::from_slice::<DelegationMessage>(&message.data)? {
+                                            DelegationMessage::Delegate(job_delegation) => {
+                                                if job_delegation.identity == identity {
+                                                    info!("Scheduled running of job: {}", hash!(job_delegation.job));
+                                                    runner_scheduler.push(runner.run(job_delegation.job)?);
+                                                }
+                                            }
+                                            _ => {}
+                                        }
                                     }
-                                },
-                                Event::Subscribed { peer_id, topic } => {
-                                    info!("{} subscribed to the topic {}", peer_id.to_string(), topic.to_string());
-                                },
-                                Event::Unsubscribed { peer_id, topic }=> {
-                                    info!("{} unsubscribed to the topic {}", peer_id.to_string(), topic.to_string());
-                                },
+                                }
                                 _ => {}
                             }
-                        },
+                        }
                         Some(Ok(job_trace)) = runner_scheduler.next() => {
                             info!("Scheduled proving of job_trace: {}", &job_trace.job_hash);
                             prover_scheduler.push(prover.run(job_trace)?);
                         },
                         Some(Ok(job_witness)) = prover_scheduler.next() => {
-                            info!("Calculated job_witness: {}", &job_witness.job_hash);
-                            let serialized_job_witness = serde_json::to_string(&job_witness)?;
-                            finished_job_topic_tx.send(serialized_job_witness.into()).await?;
+                            info!("Finished proving: {}", &job_witness.job_hash);
+                            gossipsub_tx.send(GossipsubMessage {
+                                topic: Topic::Delegation.into(),
+                                data: serde_json::to_vec(&DelegationMessage::Finished(job_witness))?
+                            }).await?;
                         },
                         _ = shutdown_signal() => {
                             break
                         }
                         else => break
                     };
-
-                    if runner_scheduler.len() + prover_scheduler.len() < MAX_PARALLEL_JOBS
-                        && !job_record.is_empty()
-                    {
-                        if let Some(job) = job_record.take_job().await {
-                            let mut flag = false;
-                            if let Ok(event) = events_rx.try_recv() {
-                                match event {
-                                    Event::Message { message, .. } => {
-                                        // Received a new-job message from the network
-                                        if message.topic
-                                            == gossipsub_ident_topic(
-                                                Network::Sepolia,
-                                                Topic::NewJob,
-                                            )
-                                            .into()
-                                        {
-                                            let job: Job = serde_json::from_slice(&message.data)?;
-                                            info!("Received a new job event: {}", hash!(&job));
-                                            job_record.register_job(job);
-                                        }
-                                        // Received a picked-job message from the network
-                                        if message.topic
-                                            == gossipsub_ident_topic(
-                                                Network::Sepolia,
-                                                Topic::PickedJob,
-                                            )
-                                            .into()
-                                        {
-                                            let job_removed: Job =
-                                                serde_json::from_slice(&message.data)?;
-                                            info!("Received picked job event: {}", hash!(&job));
-                                            job_record.remove_job(&job_removed);
-                                            if hash!(job_removed) == hash!(job) {
-                                                flag = true;
-                                            }
-                                        }
-                                    }
-                                    Event::Subscribed { peer_id, topic } => {
-                                        info!(
-                                            "{} subscribed to the topic {}",
-                                            peer_id.to_string(),
-                                            topic.to_string()
-                                        );
-                                    }
-                                    Event::Unsubscribed { peer_id, topic } => {
-                                        info!(
-                                            "{} unsubscribed to the topic {}",
-                                            peer_id.to_string(),
-                                            topic.to_string()
-                                        );
-                                    }
-                                    _ => {}
-                                }
-                            };
-                            if flag == false {
-                                let serialized_job = serde_json::to_string(&job)?;
-                                picked_job_topic_tx.send(serialized_job.into()).await?;
-                                info!("Sent picked job event: {}", hash!(&job));
-
-                                info!("Scheduled run of job: {}", hash!(&job));
-                                runner_scheduler.push(runner.run(job)?);
-                            }
-                        }
-                    }
                 }
                 Ok(())
             })),
@@ -170,10 +112,8 @@ impl Drop for Executor {
     }
 }
 
-use thiserror::Error;
-
 #[derive(Error, Debug)]
-pub enum ExecutorError {
+pub enum Error {
     #[error("prover_controller_error")]
     ProverControllerError(#[from] ProverControllerError),
 
@@ -181,7 +121,7 @@ pub enum ExecutorError {
     RunnerControllerError(#[from] RunnerControllerError),
 
     #[error("mpsc_send_error")]
-    MpscSendError(#[from] tokio::sync::mpsc::error::SendError<Vec<u8>>),
+    MpscSendError(#[from] mpsc::error::SendError<GossipsubMessage>),
 
     #[error("io")]
     Io(#[from] std::io::Error),
