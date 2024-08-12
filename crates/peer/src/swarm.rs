@@ -3,20 +3,22 @@ use futures::stream::Stream;
 use libp2p::futures::StreamExt;
 use libp2p::gossipsub::{self, IdentTopic, TopicHash};
 use libp2p::identity::Keypair;
+use libp2p::kad::store::{MemoryStore, MemoryStoreConfig};
+use libp2p::kad::{Config, Mode};
 use libp2p::swarm::{DialError, NetworkBehaviour, SwarmEvent};
-use libp2p::{noise, tcp, yamux, Multiaddr, Swarm, SwarmBuilder};
+use libp2p::{kad, noise, tcp, yamux, Multiaddr, Swarm, SwarmBuilder};
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 use zetina_common::graceful_shutdown::shutdown_signal;
-use zetina_common::job::{Job, JobBid, JobDelegation};
-use zetina_common::job_witness::JobWitness;
+use zetina_common::job::{Job, JobBid};
 
 #[derive(NetworkBehaviour)]
 pub struct PeerBehaviour {
     gossipsub: gossipsub::Behaviour,
+    kademlia: kad::Behaviour<MemoryStore>,
 }
 
 pub struct SwarmRunner {
@@ -53,9 +55,16 @@ impl From<Topic> for IdentTopic {
     }
 }
 
+#[derive(Debug)]
 pub struct GossipsubMessage {
     pub topic: IdentTopic,
     pub data: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub enum KademliaMessage {
+    GET(kad::RecordKey),
+    PUT((kad::RecordKey, Vec<u8>)),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -66,13 +75,14 @@ pub enum NetworkingMessage {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum MarketMessage {
     Job(Job),
+    JobBidPropagation(kad::RecordKey),
     JobBid(JobBid),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum DelegationMessage {
-    Delegate(JobDelegation),
-    Finished(JobWitness),
+    Delegate(JobBid),
+    Finished(kad::RecordKey, kad::RecordKey),
 }
 
 impl SwarmRunner {
@@ -81,6 +91,8 @@ impl SwarmRunner {
         p2p_keypair: Keypair,
         p2p_multiaddr: Multiaddr,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut config = Config::default();
+        config.set_max_packet_size(1024 * 1024 * 100);
         let mut swarm = SwarmBuilder::with_existing_identity(p2p_keypair)
             .with_tokio()
             .with_tcp(
@@ -90,14 +102,26 @@ impl SwarmRunner {
             )?
             .with_quic()
             .with_behaviour(|p2p_keypair| PeerBehaviour {
+                kademlia: kad::Behaviour::with_config(
+                    p2p_keypair.public().to_peer_id(),
+                    MemoryStore::with_config(
+                        p2p_keypair.public().to_peer_id(),
+                        MemoryStoreConfig {
+                            max_value_bytes: 1024 * 1024 * 100,
+                            ..Default::default()
+                        },
+                    ),
+                    config,
+                ),
                 gossipsub: Self::init_gossip(p2p_keypair).unwrap(),
             })?
-            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(10)))
             .build();
 
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Networking.as_str()))?;
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Market.as_str()))?;
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Delegation.as_str()))?;
+        swarm.behaviour_mut().kademlia.set_mode(Some(Mode::Server));
         // swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
         swarm.listen_on(listen_multiaddr)?;
 
@@ -122,18 +146,38 @@ impl SwarmRunner {
     pub fn run(
         mut self,
         mut gossipsub_message: mpsc::Receiver<GossipsubMessage>,
+        mut kademlia_message: mpsc::Receiver<KademliaMessage>,
     ) -> Pin<Box<dyn Stream<Item = PeerBehaviourEvent> + Send>> {
         let stream = stream! {
             loop {
                 tokio::select! {
                     Some(message) = gossipsub_message.recv() => {
-                        debug!{"Sending gossipsub_message: topic {}, data {:?}", message.topic, message.data};
+                        debug!{"Sending gossipsub_message: topic {}, data {}", message.topic, hex::encode(&message.data)};
                         if let Err(e) = self.swarm
                             .behaviour_mut()
                             .gossipsub
                             .publish(message.topic, message.data)
                         {
-                            error!("Publish error: {e:?}");
+                            error!("Gossipsub error: {e:?}");
+                        }
+                    },
+                    Some(message) = kademlia_message.recv() => {
+                        debug!{"Sending kademlia_message: {:?}", message};
+                        match message {
+                            KademliaMessage::GET(key) => {
+                                self.swarm.behaviour_mut().kademlia.get_record(kad::RecordKey::new(&key));
+                            },
+                            KademliaMessage::PUT((key, data)) => {
+                                let record = kad::Record {
+                                    key: kad::RecordKey::new(&key),
+                                    value: data,
+                                    publisher: None,
+                                    expires: None,
+                                };
+                                if let Err(e) = self.swarm.behaviour_mut().kademlia.put_record(record, kad::Quorum::One) {
+                                    error!("Kademlia error: {e:?}");
+                                }
+                            },
                         }
                     },
                     event = self.swarm.select_next_some() => match event {
@@ -175,13 +219,59 @@ impl SwarmRunner {
                                 message,
                             });
                         }
-                        SwarmEvent::ConnectionEstablished { peer_id, connection_id, num_established, .. } => {
+                        SwarmEvent::ConnectionEstablished { peer_id, connection_id, num_established, endpoint, .. } => {
                             info!{"Connection established: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
                             self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                            self.swarm.behaviour_mut().kademlia.add_address(&peer_id, endpoint.get_remote_address().to_owned());
                         }
-                        SwarmEvent::ConnectionClosed { peer_id, connection_id, num_established, .. } => {
+                        SwarmEvent::ConnectionClosed { peer_id, connection_id, num_established, endpoint, .. } => {
                             info!{"Connection closed: peer_id {}, connection_id {}, num_established {}", peer_id, connection_id, num_established};
-                            self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                            if num_established == 0 {
+                                self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                                self.swarm.behaviour_mut().kademlia.remove_address(&peer_id, endpoint.get_remote_address());
+                            }
+                        }
+                        SwarmEvent::Behaviour(PeerBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { id, result, stats, step })) => {
+                            match result {
+                                kad::QueryResult::GetProviders(Ok(kad::GetProvidersOk::FoundProviders { key, providers, .. })) => {
+                                    for peer in providers {
+                                        info!("Peer {peer:?} provides key {}", hex::encode(&key));
+                                    }
+                                }
+                                kad::QueryResult::GetProviders(Err(err)) => {
+                                    error!("Failed to get providers: {err:?}");
+                                }
+                                kad::QueryResult::GetRecord(Ok(kad::GetRecordOk::FoundRecord(kad::PeerRecord {peer, record}))) => {
+                                    info!("Successfully got record {}", hex::encode(&record.key));
+
+                                    yield PeerBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { id,
+                                        result: kad::QueryResult::GetRecord(Ok(kad::GetRecordOk::FoundRecord(kad::PeerRecord {peer, record}))),
+                                        stats, step })
+                                }
+                                kad::QueryResult::GetRecord(Ok(_)) => {}
+                                kad::QueryResult::GetRecord(Err(err)) => {
+                                    error!("Failed to get record: {err:?}");
+                                }
+                                kad::QueryResult::PutRecord(Ok(kad::PutRecordOk { key })) => {
+                                    info!("Successfully put record {}", hex::encode(&key));
+
+                                    yield PeerBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { id,
+                                        result: kad::QueryResult::PutRecord(Ok(kad::PutRecordOk { key })),
+                                        stats, step })
+                                }
+                                kad::QueryResult::PutRecord(Err(err)) => {
+                                    error!("Failed to put record: {err:?}");
+                                }
+                                kad::QueryResult::StartProviding(Ok(kad::AddProviderOk { key })) => {
+                                    info!("Successfully put provider record {}", hex::encode(&key));
+                                }
+                                kad::QueryResult::StartProviding(Err(err)) => {
+                                    error!("Failed to put provider record: {err:?}");
+                                }
+                                event => {
+                                    debug!("Unhandled event: {:?}", event);
+                                }
+                            }
                         }
                         SwarmEvent::Behaviour(event) => {
                             yield event;

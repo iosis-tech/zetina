@@ -10,7 +10,7 @@ use axum::{
 };
 use clap::Parser;
 use delegator::{Delegator, DelegatorEvent};
-use libp2p::Multiaddr;
+use libp2p::{kad, Multiaddr};
 use starknet::{core::types::FieldElement, signers::SigningKey};
 use std::{str::FromStr, time::Duration};
 use tokio::{
@@ -24,7 +24,7 @@ use tower_http::{
 };
 use tracing_subscriber::EnvFilter;
 use zetina_common::{graceful_shutdown::shutdown_signal, job::JobData};
-use zetina_peer::swarm::{GossipsubMessage, SwarmRunner};
+use zetina_peer::swarm::{GossipsubMessage, KademliaMessage, SwarmRunner};
 
 #[derive(Parser)]
 struct Cli {
@@ -71,11 +71,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     let (gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
-    let (delegate_tx, delegate_rx) = mpsc::channel::<JobData>(100);
-    let (events_tx, events_rx) = broadcast::channel::<(u64, DelegatorEvent)>(100);
-    let swarm_events = swarm_runner.run(gossipsub_rx);
+    let (kademlia_tx, kademlia_rx) = mpsc::channel::<KademliaMessage>(100);
+    let swarm_events = swarm_runner.run(gossipsub_rx, kademlia_rx);
 
-    Delegator::new(swarm_events, gossipsub_tx, delegate_rx, events_tx, signing_key);
+    let (delegate_tx, delegate_rx) = mpsc::channel::<JobData>(100);
+    let (events_tx, events_rx) = broadcast::channel::<(kad::RecordKey, DelegatorEvent)>(100);
+    Delegator::new(swarm_events, gossipsub_tx, kademlia_tx, delegate_rx, events_tx, signing_key);
 
     // Create a `TcpListener` using tokio.
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();

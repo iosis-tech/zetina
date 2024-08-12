@@ -2,6 +2,7 @@ use self::types::input::SimpleBootloaderInput;
 use crate::{errors::RunnerControllerError, traits::RunnerController};
 use async_process::Stdio;
 use futures::Future;
+use libp2p::kad;
 use starknet::signers::VerifyingKey;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
@@ -36,7 +37,7 @@ impl RunnerController for CairoRunner {
         let future: Pin<
             Box<dyn Future<Output = Result<JobTrace, RunnerControllerError>> + Send + '_>,
         > = Box::pin(async move {
-            let job_hash = hash!(job);
+            let job_key = kad::RecordKey::new(&hash!(job).to_be_bytes());
             let layout: &str = Layout::Starknet.into();
 
             let mut cairo_pie = NamedTempFile::new()?;
@@ -77,7 +78,7 @@ impl RunnerController for CairoRunner {
                 .stdout(Stdio::null())
                 .spawn()?;
 
-            debug!("task {} spawned", job_hash);
+            debug!("task {} spawned", hex::encode(&job_key));
 
             loop {
                 select! {
@@ -95,7 +96,7 @@ impl RunnerController for CairoRunner {
                     }
                 }
             }
-            Ok(JobTrace { job_hash, air_public_input, air_private_input, memory, trace })
+            Ok(JobTrace::new(job_key, air_public_input, air_private_input, memory, trace))
         });
 
         Ok(Process::new(future, terminate_tx))

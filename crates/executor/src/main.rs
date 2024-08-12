@@ -11,7 +11,7 @@ use tokio::{net::TcpListener, sync::mpsc};
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing_subscriber::EnvFilter;
 use zetina_common::graceful_shutdown::shutdown_signal;
-use zetina_peer::swarm::{GossipsubMessage, SwarmRunner};
+use zetina_peer::swarm::{GossipsubMessage, KademliaMessage, SwarmRunner};
 use zetina_prover::stone_prover::StoneProver;
 use zetina_runner::cairo_runner::CairoRunner;
 
@@ -68,12 +68,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     let (gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
-    let swarm_events = swarm_runner.run(gossipsub_rx);
+    let (kademlia_tx, kademlia_rx) = mpsc::channel::<KademliaMessage>(100);
+    let swarm_events = swarm_runner.run(gossipsub_rx, kademlia_rx);
 
     let runner = CairoRunner::new(bootloader_program_path, signing_key.verifying_key());
     let prover = StoneProver::new();
-
-    Executor::new(identity, swarm_events, gossipsub_tx, runner, prover);
+    Executor::new(identity, swarm_events, gossipsub_tx, kademlia_tx, runner, prover);
 
     // Create a `TcpListener` using tokio.
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();

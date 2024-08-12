@@ -8,14 +8,13 @@ use futures::Future;
 use serde_json::Value;
 use std::{
     fs,
-    hash::{DefaultHasher, Hash, Hasher},
     io::{Read, Write},
     pin::Pin,
 };
 use tempfile::NamedTempFile;
 use tokio::{process::Command, select, sync::mpsc};
 use tracing::debug;
-use zetina_common::{hash, job_trace::JobTrace, job_witness::JobWitness, process::Process};
+use zetina_common::{job_trace::JobTrace, job_witness::JobWitness, process::Process};
 
 pub mod tests;
 pub mod types;
@@ -67,9 +66,7 @@ impl ProverController for StoneProver {
                 .stdout(Stdio::null())
                 .spawn()?;
 
-            let job_trace_hash = hash!(job_trace);
-
-            debug!("task {} spawned", job_trace_hash);
+            debug!("task {} spawned", hex::encode(&job_trace.job_key));
 
             loop {
                 select! {
@@ -91,7 +88,7 @@ impl ProverController for StoneProver {
             let mut proof = Vec::new();
             out_file.read_to_end(&mut proof)?;
 
-            Ok(JobWitness { job_hash: job_trace.job_hash, proof })
+            Ok(JobWitness { job_key: job_trace.job_key.to_owned(), proof })
         });
 
         Ok(Process::new(future, terminate_tx))
@@ -127,10 +124,10 @@ pub fn params(n_steps: u64) -> Params {
                     )
                     .collect(),
                 last_layer_degree_bound,
-                n_queries: 1,
-                proof_of_work_bits: 1,
+                n_queries: 20,
+                proof_of_work_bits: 30,
             },
-            log_n_cosets: 1,
+            log_n_cosets: 2,
         },
         ..Default::default()
     }

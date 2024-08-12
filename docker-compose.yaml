@@ -43,8 +43,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '5'
-          memory: '15G'
+          cpus: '10'
+          memory: '25G'
     environment:
       - RUST_LOG=info
     image: zetina-executor
@@ -66,8 +66,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '5'
-          memory: '15G'
+          cpus: '10'
+          memory: '25G'
     environment:
       - RUST_LOG=info
     image: zetina-executor

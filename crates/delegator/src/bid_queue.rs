@@ -1,7 +1,7 @@
-use libp2p::PeerId;
+use libp2p::{kad, PeerId};
 use std::{collections::BTreeMap, future::Future, pin::Pin, time::Duration};
 use tokio::{sync::mpsc, time::sleep};
-use zetina_common::{job::Job, process::Process};
+use zetina_common::process::Process;
 
 pub struct BidQueue {}
 
@@ -19,17 +19,21 @@ impl Default for BidQueue {
 
 impl BidQueue {
     pub fn run<'future>(
-        job: Job,
+        job_hash: kad::RecordKey,
     ) -> (
-        Process<'future, Result<(Job, BTreeMap<u64, Vec<PeerId>>), BidControllerError>>,
+        Process<'future, Result<(kad::RecordKey, BTreeMap<u64, Vec<PeerId>>), BidControllerError>>,
         mpsc::Sender<(u64, PeerId)>,
     ) {
         let (terminate_tx, mut terminate_rx) = mpsc::channel::<()>(10);
         let (bid_tx, mut bid_rx) = mpsc::channel::<(u64, PeerId)>(10);
         let future: Pin<
             Box<
-                dyn Future<Output = Result<(Job, BTreeMap<u64, Vec<PeerId>>), BidControllerError>>
-                    + Send
+                dyn Future<
+                        Output = Result<
+                            (kad::RecordKey, BTreeMap<u64, Vec<PeerId>>),
+                            BidControllerError,
+                        >,
+                    > + Send
                     + '_,
             >,
         > = Box::pin(async move {
@@ -53,7 +57,7 @@ impl BidQueue {
                         }
                     }
                     _ = sleep(duration) => {
-                        break Ok((job, bids.take().ok_or(BidControllerError::BidsTerminated)?))
+                        break Ok((job_hash, bids.take().ok_or(BidControllerError::BidsTerminated)?))
                     }
                     _ = terminate_rx.recv() => {
                         break Err(BidControllerError::TaskTerminated);
