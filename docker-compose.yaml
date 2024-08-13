@@ -12,6 +12,22 @@ services:
     depends_on:
       - zetina-stone-prover
 
+  zetina-delegator-dashboard-1:
+    build:
+      context: dashboard
+      dockerfile: dashboard.dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+    image: zetina-delegator-dashboard
+    hostname: zetina-delegator-dashboard-1
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+
   zetina-delegator-1:
     build:
       dockerfile: delegator.dockerfile

@@ -18,7 +18,7 @@ spec:
         image: registry.internal.iosis.tech/zetina-delegator-dashboard
         resources:
           limits:
-            cpu: "1000m"
+            cpu: "1"
             memory: "1Gi"
         ports:
         - containerPort: 3000

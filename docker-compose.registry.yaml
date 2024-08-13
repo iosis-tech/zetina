@@ -5,6 +5,9 @@ services:
   zetina-runtime:
     image: registry.internal.iosis.tech/zetina-runtime
 
+  zetina-delegator-dashboard-1:
+    image: registry.internal.iosis.tech/zetina-delegator-dashboard
+
   zetina-delegator-1:
     image: registry.internal.iosis.tech/zetina-delegator
 

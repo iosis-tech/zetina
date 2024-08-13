@@ -4,6 +4,10 @@ kind: Kustomization
 namespace: iosis-tech-zetina
 
 resources:
+- delegator/delegator-dashboard-deployment.yaml
+- delegator/certificates.yaml
+- delegator/issuer.yaml
+- delegator/deployment.yaml
 - executor/deployment-1.yaml
 - executor/deployment-2.yaml
 - executor/deployment-3.yaml

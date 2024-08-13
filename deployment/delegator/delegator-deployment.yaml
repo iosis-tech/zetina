@@ -1,67 +1,84 @@
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: delegator
+  name: delegator-1
 spec:
+  replicas: 1
   selector:
     matchLabels:
-      app: delegator
-  replicas: 1
+      app: delegator-1
   template:
     metadata:
       labels:
-        app: delegator
+        app: delegator-1
     spec:
+      initContainers:
+      - name: wait-for-executor-1
+        image: curlimages/curl:latest
+        command:
+        - "sh"
+        - "-c"
+        - |
+          until curl -sf http://executor-1-service.iosis-tech-zetina.svc.cluster.local:3000/health | grep -q "Health check: OK"; do
+            echo "Waiting for executor-1 to be ready..."
+            sleep 1
+          done
       containers:
-      - name: delegator
-        image: registry.internal.iosis.tech/zetina-delegator
-        command: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -p 018ef9563461ec2d88236d59039babf44c97d8bf6200d01d81170f1f60a78f34 -d /ip4/83.238.171.134/tcp/5679/p2p/QmVUbnW8PjFw2yUt1DDukUTZrK1t2vPGkNb1SQgserjaXV -d /ip4/83.238.171.134/tcp/5681/p2p/QmUEi69CXN8SXEYhkzoqJzQ6aEHTKqJzewqirBiT8FKmBu -d /ip4/83.238.171.134/tcp/5683/p2p/QmYaed2psXu4UMTXqrrRUE7PaYnwGFkvGvKvTUBCQSry4S"]
+      - name: delegator-1
+        image: registry.internal.iosis.tech/zetina-delegator:latest
+        args: ["bash", "-ci", "cargo run --release --bin zetina-delegator -- -l /ip4/0.0.0.0/tcp/5685 -p $(PRIVATE_KEY) -a $(ADDRESS) -d $(DIAL)"]
         resources:
-          requests:
-            cpu: "1"
-            memory: "1Gi"
           limits:
             cpu: "1"
             memory: "1Gi"
         env:
         - name: RUST_LOG
-          value: "info"
+          valueFrom:
+            configMapKeyRef:
+              name: zetina-config
+              key: RUST_LOG
+        - name: PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: zetina-secret
+              key: PRIVATE_KEY_4
+        - name: ADDRESS
+          valueFrom:
+            secretKeyRef:
+              name: zetina-secret
+              key: ADDRESS_4
+        - name: DIAL
+          valueFrom:
+            secretKeyRef:
+              name: zetina-secret
+              key: ADDRESS_1
         ports:
         - containerPort: 3000
+        - containerPort: 5684
+        - containerPort: 5685
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: delegator-service
-spec:
-  selector:
-    app: delegator
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 3000
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: delegator-ingress
+  name: delegator-1-service
   annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    kube-vip.io/loadbalancerIPs: "0.0.0.0"
+    kube-vip.io/hwaddr: "00:00:6C:32:98:85"
+    kube-vip.io/loadbalancerHostname: "zetina-delegator-1"
 spec:
-  ingressClassName: nginx-ingress-prod
-  tls:
-  - hosts:
-    - delegator.zetina.iosis.tech
-    secretName: zetina-tls
-  rules:
-  - host: delegator.zetina.iosis.tech
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: delegator-service
-            port:
-              number: 80
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: api-port
+  - port: 5684
+    targetPort: 5684
+    protocol: UDP
+    name: p2p-quic-port
+  - port: 5685
+    targetPort: 5685
+    protocol: TCP
+    name: p2p-tcp-port
+  selector:
+    app: delegator-1
+  type: LoadBalancer
