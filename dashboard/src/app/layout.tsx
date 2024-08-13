@@ -17,7 +17,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="icon" href="zetina-logo.png" />
+        <meta name="theme-color" content="#000" />
+        <meta
+          name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent"
+        />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="#000" />
+        <meta name="msapplication-navbutton-color" content="#000" />
       </head>
       <body className={inter.className}>{children}</body>
     </html>

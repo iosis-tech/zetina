@@ -304,7 +304,7 @@ export default function Home() {
             </Stepper>
             <div
               ref={scrollContainerRef}
-              className="scroll-container p-1 px-4 border-2 border-gray-800 rounded-2xl backdrop-blur-md h-20 overflow-y-scroll text-sm text-wrap break-words text-gray-500"
+              className="scroll-container p-1 px-4 border-2 border-gray-800 rounded-2xl backdrop-blur-md h-32 overflow-y-scroll text-xs text-wrap break-words text-gray-500"
             >
               {logs.map((log, index) => (
                 <div key={index}>{log}</div>
