@@ -84,7 +84,6 @@ function QontoStepIcon(props: StepIconProps) {
   );
 }
 
-
 export default function Home() {
   const workerRef = useRef<Worker>();
   const darkTheme = createTheme({
@@ -183,7 +182,7 @@ export default function Home() {
           const data: DelegateResponse = DelegateResponse.parse(
             await response.json(),
           );
-          addLog(`Job ${data.job_key} sent to the p2p network`)
+          addLog(`Job ${data.job_key} sent to the p2p network`);
           setActiveStep(1);
           setIsProcessing(data.job_key);
 
@@ -194,17 +193,19 @@ export default function Home() {
               let job_event = JobEventsResponse.parse(event);
               if (job_event.type == "BidReceived") {
                 let peer_id = PeerId.parse(job_event.data);
-                addLog(`Recived bid for job ${data.job_key} from peer ${peer_id}`)
+                addLog(
+                  `Recived bid for job ${data.job_key} from peer ${peer_id}`,
+                );
                 setActiveStep(2);
               }
               if (job_event.type == "Delegated") {
                 let peer_id = PeerId.parse(job_event.data);
-                addLog(`Job ${data.job_key} delegated to peer ${peer_id}`)
+                addLog(`Job ${data.job_key} delegated to peer ${peer_id}`);
                 setActiveStep(3);
               }
               if (job_event.type == "Finished") {
                 let proof = Proof.parse(job_event.data);
-                addLog(`Job ${data.job_key} proof received`)
+                addLog(`Job ${data.job_key} proof received`);
                 setActiveStep(4);
                 setDownloadBlob([
                   new Blob([new Uint8Array(proof)]),
@@ -212,7 +213,9 @@ export default function Home() {
                 ]);
                 setIsProcessing(null);
                 subscriber?.close();
-                await verifyProof(new TextDecoder().decode(new Uint8Array(job_event.data)))
+                await verifyProof(
+                  new TextDecoder().decode(new Uint8Array(job_event.data)),
+                );
               }
             },
           );
@@ -249,15 +252,16 @@ export default function Home() {
 
   useEffect(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      scrollContainerRef.current.scrollTop =
+        scrollContainerRef.current.scrollHeight;
     }
   }, [logs]);
 
   return (
     <ThemeProvider theme={darkTheme}>
-      <div className="h-screen flex flex-col background">
-        <main className="flex-1 grid justify-center items-center">
-          <div className="p-10 border-2 border-gray-800 rounded-2xl backdrop-blur-md grid grid-flow-row gap-8 w-[800px]">
+      <div className="h-screen flex flex-col">
+        <main className="flex-1 grid items-center">
+          <div className="p-10 border-2 border-gray-800 rounded-2xl backdrop-blur-md grid grid-flow-row gap-8 max-w-[1000px] w-full mx-auto">
             <div className="text-center font-medium grid grid-flow-row gap-1">
               <div className="text-xl font-bold">Zetina network</div>
               <div className="text-md">Prove program Pie</div>
@@ -298,7 +302,10 @@ export default function Home() {
                 </Step>
               ))}
             </Stepper>
-            <div ref={scrollContainerRef} className="scroll-container p-1 px-4 border-2 border-gray-800 rounded-2xl backdrop-blur-md h-20 overflow-y-scroll text-sm text-wrap break-words text-gray-500">
+            <div
+              ref={scrollContainerRef}
+              className="scroll-container p-1 px-4 border-2 border-gray-800 rounded-2xl backdrop-blur-md h-32 overflow-y-scroll text-xs text-wrap break-words text-gray-500"
+            >
               {logs.map((log, index) => (
                 <div key={index}>{log}</div>
               ))}

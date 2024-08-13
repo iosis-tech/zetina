@@ -1,8 +1,11 @@
 import { z } from "zod";
 
-const hexStringSchema = z.string().regex(/^[0-9a-fA-F]+$/, 'Invalid hex string');
-const base58Pattern = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
-const base58Schema = z.string().regex(base58Pattern, 'Invalid Base58 string');
+const hexStringSchema = z
+  .string()
+  .regex(/^[0-9a-fA-F]+$/, "Invalid hex string");
+const base58Pattern =
+  /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
+const base58Schema = z.string().regex(base58Pattern, "Invalid Base58 string");
 const bytesSchema = z.array(z.number());
 
 // Zod  for DelegateRequest
@@ -13,18 +16,21 @@ export type DelegateRequest = z.infer<typeof DelegateRequest>;
 
 // Zod  for DelegateResponse
 export const DelegateResponse = z.object({
-  job_key: hexStringSchema
+  job_key: hexStringSchema,
 });
 export type DelegateResponse = z.infer<typeof DelegateResponse>;
 
 // Zod  for JobEventsRequest
 export const JobEventsRequest = z.object({
-  job_key: hexStringSchema
+  job_key: hexStringSchema,
 });
 export type JobEventsRequest = z.infer<typeof JobEventsRequest>;
 
 export const JobEventsResponse = z.object({
-  type: z.literal("Finished").or(z.literal("Delegated")).or(z.literal("BidReceived")),
+  type: z
+    .literal("Finished")
+    .or(z.literal("Delegated"))
+    .or(z.literal("BidReceived")),
   data: z.any(),
 });
 export type JobEventsResponse = z.infer<typeof JobEventsResponse>;
