@@ -82,3 +82,27 @@ spec:
   selector:
     app: delegator-1
   type: LoadBalancer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: delegator-1-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  ingressClassName: nginx-ingress-prod
+  tls:
+  - hosts:
+    - api.delegator.zetina.iosis.tech
+    secretName: zetina-tls
+  rules:
+  - host: api.delegator.zetina.iosis.tech
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: delegator-1-service
+            port:
+              number: 3000

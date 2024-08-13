@@ -41,11 +41,11 @@ build/
 Thumbs.db
 
 # Directories not needed in Docker context
+stone-prover/
+deployment/
 dashboard/
-k8s/
-docs/
 registry/
-utils/
+docs/
 .git/
 .github/
 

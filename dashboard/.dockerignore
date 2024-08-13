@@ -36,5 +36,3 @@ coverage
 *.spec.js
 *.test.ts
 *.spec.ts
-
-k8s/

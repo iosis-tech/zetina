@@ -6,6 +6,7 @@ spec:
   secretName: zetina-tls
 
   dnsNames:
+  - api.delegator.zetina.iosis.tech
   - dashboard.delegator.zetina.iosis.tech
   issuerRef:
     name: letsencrypt-http01
