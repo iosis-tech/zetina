@@ -259,9 +259,9 @@ export default function Home() {
 
   return (
     <ThemeProvider theme={darkTheme}>
-      <div className="h-screen flex flex-col background">
-        <main className="flex-1 grid justify-center items-center">
-          <div className="p-10 border-2 border-gray-800 rounded-2xl backdrop-blur-md grid grid-flow-row gap-8 w-[800px]">
+      <div className="h-screen flex flex-col">
+        <main className="flex-1 grid items-center">
+          <div className="p-10 border-2 border-gray-800 rounded-2xl backdrop-blur-md grid grid-flow-row gap-8 max-w-[1000px] w-full mx-auto">
             <div className="text-center font-medium grid grid-flow-row gap-1">
               <div className="text-xl font-bold">Zetina network</div>
               <div className="text-md">Prove program Pie</div>
