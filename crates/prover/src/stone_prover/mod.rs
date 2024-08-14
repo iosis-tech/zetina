@@ -124,10 +124,10 @@ pub fn params(n_steps: u64) -> Params {
                     )
                     .collect(),
                 last_layer_degree_bound,
-                n_queries: 20,
+                n_queries: 10,
                 proof_of_work_bits: 30,
             },
-            log_n_cosets: 2,
+            log_n_cosets: 1,
         },
         ..Default::default()
     }

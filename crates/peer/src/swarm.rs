@@ -23,6 +23,9 @@ pub struct PeerBehaviour {
 
 pub struct SwarmRunner {
     pub swarm: Swarm<PeerBehaviour>,
+    pub listen_multiaddr: Multiaddr,
+    pub dial_multiaddrs: Vec<Multiaddr>,
+    pub p2p_keypair: Keypair,
     pub p2p_multiaddr: Multiaddr,
 }
 
@@ -88,12 +91,14 @@ pub enum DelegationMessage {
 impl SwarmRunner {
     pub fn new(
         listen_multiaddr: Multiaddr,
+        dial_multiaddrs: Vec<Multiaddr>,
         p2p_keypair: Keypair,
         p2p_multiaddr: Multiaddr,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut config = Config::default();
         config.set_max_packet_size(1024 * 1024 * 100);
-        let mut swarm = SwarmBuilder::with_existing_identity(p2p_keypair)
+        config.set_query_timeout(Duration::from_secs(60));
+        let mut swarm = SwarmBuilder::with_existing_identity(p2p_keypair.to_owned())
             .with_tokio()
             .with_tcp(
                 tcp::Config::default().port_reuse(true),
@@ -115,7 +120,7 @@ impl SwarmRunner {
                 ),
                 gossipsub: Self::init_gossip(p2p_keypair).unwrap(),
             })?
-            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(10)))
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
             .build();
 
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Networking.as_str()))?;
@@ -123,9 +128,11 @@ impl SwarmRunner {
         swarm.behaviour_mut().gossipsub.subscribe(&IdentTopic::new(Topic::Delegation.as_str()))?;
         swarm.behaviour_mut().kademlia.set_mode(Some(Mode::Server));
         // swarm.listen_on("/ip4/0.0.0.0/udp/5678/quic-v1".parse()?)?;
-        swarm.listen_on(listen_multiaddr)?;
+        swarm.listen_on(listen_multiaddr.to_owned())?;
 
-        Ok(SwarmRunner { swarm, p2p_multiaddr })
+        dial_multiaddrs.iter().try_for_each(|addr| swarm.dial(addr.clone()))?;
+
+        Ok(SwarmRunner { swarm, listen_multiaddr, dial_multiaddrs, p2p_keypair, p2p_multiaddr })
     }
 
     fn init_gossip(
@@ -229,6 +236,9 @@ impl SwarmRunner {
                             if num_established == 0 {
                                 self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                                 self.swarm.behaviour_mut().kademlia.remove_address(&peer_id, endpoint.get_remote_address());
+                                if let Err(err) = self.swarm.dial(endpoint.get_remote_address().to_owned()) {
+                                    error!("Failed to re-dial peer: {err:?}");
+                                }
                             }
                         }
                         SwarmEvent::Behaviour(PeerBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { id, result, stats, step })) => {
