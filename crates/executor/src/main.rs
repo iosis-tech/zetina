@@ -56,16 +56,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .join("../../");
     let bootloader_program_path = ws_root.join("target/bootloader.json");
 
-    let mut swarm_runner = SwarmRunner::new(
+    let swarm_runner = SwarmRunner::new(
         cli.listen_address.parse()?,
+        cli.dial_addresses
+            .iter()
+            .map(|addr| Multiaddr::from_str(addr))
+            .collect::<Result<Vec<Multiaddr>, _>>()?,
         p2p_keypair,
-        Multiaddr::from_str(&cli.address).unwrap(),
+        Multiaddr::from_str(&cli.address)?,
     )?;
-
-    cli.dial_addresses
-        .into_iter()
-        .try_for_each(|addr| swarm_runner.swarm.dial(Multiaddr::from_str(&addr).unwrap()))
-        .unwrap();
 
     let (gossipsub_tx, gossipsub_rx) = mpsc::channel::<GossipsubMessage>(100);
     let (kademlia_tx, kademlia_rx) = mpsc::channel::<KademliaMessage>(100);
