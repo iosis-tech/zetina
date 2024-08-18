@@ -11,7 +11,7 @@ use tokio::{net::TcpListener, sync::mpsc};
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing_subscriber::EnvFilter;
 use zetina_common::graceful_shutdown::shutdown_signal;
-use zetina_peer::swarm::{GossipsubMessage, KademliaMessage, SwarmRunner};
+use zetina_peer::{GossipsubMessage, KademliaMessage, SwarmRunner};
 use zetina_prover::stone_prover::StoneProver;
 use zetina_runner::cairo_runner::CairoRunner;
 

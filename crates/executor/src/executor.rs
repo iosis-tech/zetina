@@ -14,7 +14,7 @@ use zetina_common::{
     graceful_shutdown::shutdown_signal, job::JobBid, job_trace::JobTrace, job_witness::JobWitness,
     process::Process,
 };
-use zetina_peer::swarm::{
+use zetina_peer::{
     DelegationMessage, GossipsubMessage, KademliaMessage, MarketMessage, PeerBehaviourEvent, Topic,
 };
 use zetina_prover::{

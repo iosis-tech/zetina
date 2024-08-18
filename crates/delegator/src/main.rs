@@ -24,7 +24,7 @@ use tower_http::{
 };
 use tracing_subscriber::EnvFilter;
 use zetina_common::{graceful_shutdown::shutdown_signal, job::JobData};
-use zetina_peer::swarm::{GossipsubMessage, KademliaMessage, SwarmRunner};
+use zetina_peer::{GossipsubMessage, KademliaMessage, SwarmRunner};
 
 #[derive(Parser)]
 struct Cli {
