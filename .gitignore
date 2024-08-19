@@ -26,6 +26,7 @@ bootloader*.json
 *.swp
 *.swo
 .env
+.resources
 
 # IDE-specific
 .vscode/

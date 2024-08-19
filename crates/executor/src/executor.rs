@@ -62,7 +62,7 @@ impl Executor {
                                                         data: serde_json::to_vec(&MarketMessage::JobBid(JobBid {
                                                             identity,
                                                             job_key,
-                                                            price: (runner_scheduler.len() * prover_scheduler.len()) as u64,
+                                                            price: (runner_scheduler.len() + 2 * prover_scheduler.len()) as u64,
                                                         }))?
                                                     })
                                                     .await?

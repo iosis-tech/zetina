@@ -6,7 +6,9 @@ pub enum Hash {
     Pedersen,
     Poseidon3,
     Keccak256,
+    Blake256,
     Keccak256Masked160Lsb,
+    Blake256Masked160Lsb,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -58,9 +60,9 @@ impl Default for Params {
         Self {
             field: Field::PrimeField0,
             channel_hash: Hash::Poseidon3,
-            commitment_hash: Hash::Keccak256Masked160Lsb,
+            commitment_hash: Hash::Blake256Masked160Lsb,
             n_verifier_friendly_commitment_layers: 0,
-            pow_hash: Hash::Keccak256,
+            pow_hash: Hash::Blake256,
             statement: Statement::default(),
             stark: Stark::default(),
             use_extension_field: false,
