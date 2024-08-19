@@ -10,13 +10,13 @@ use thiserror::Error;
 use tokio::sync::{broadcast, mpsc};
 use tokio::{sync::mpsc::Sender, task::JoinHandle};
 use tokio_stream::StreamExt;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use zetina_common::graceful_shutdown::shutdown_signal;
 use zetina_common::hash;
 use zetina_common::job::{Job, JobBid, JobData};
 use zetina_common::job_witness::JobWitness;
 use zetina_common::process::Process;
-use zetina_peer::swarm::{
+use zetina_peer::{
     DelegationMessage, GossipsubMessage, KademliaMessage, MarketMessage, PeerBehaviourEvent, Topic,
 };
 
@@ -91,7 +91,8 @@ impl Delegator {
                                             info!("Propagated job: {} for bidding", hex::encode(&key));
                                             let (process, bid_tx) = BidQueue::run(key.to_owned());
                                             job_bid_scheduler.push(process);
-                                            job_hash_store.insert(key, bid_tx);
+                                            job_hash_store.insert(key.to_owned(), bid_tx);
+                                            events_tx.send((key, DelegatorEvent::Propagated))?;
                                         },
                                         kad::QueryResult::GetRecord(Ok(
                                             kad::GetRecordOk::FoundRecord(kad::PeerRecord {
@@ -111,16 +112,34 @@ impl Delegator {
                                 _ => {}
                             }
                         }
-                        Some(Ok((job_key, bids))) = job_bid_scheduler.next() => {
-                            let bid = bids.first_key_value().unwrap();
-                            let price = *bid.0;
-                            let identity = *bid.1.first().unwrap();
-                            info!("Job {} delegated to best bidder: {}", hex::encode(&job_key), identity);
-                            gossipsub_tx.send(GossipsubMessage {
-                                topic: Topic::Delegation.into(),
-                                data: serde_json::to_vec(&DelegationMessage::Delegate(JobBid{identity, job_key: job_key.to_owned(), price}))?
-                            }).await?;
-                            events_tx.send((job_key, DelegatorEvent::Delegated(identity)))?;
+                        Some(Ok((job_key, mut bids))) = job_bid_scheduler.next() => {
+                            if let Some((price, identities)) = bids.pop_first() {
+                                if identities.is_empty() {
+                                    warn!("Job {} did not receive any bids", hex::encode(&job_key));
+                                } else {
+                                    for identity in identities {
+                                        let result = Box::pin(async {
+                                            gossipsub_tx.send(GossipsubMessage {
+                                                topic: Topic::Delegation.into(),
+                                                data: serde_json::to_vec(&DelegationMessage::Delegate(JobBid {
+                                                    identity,
+                                                    job_key: job_key.clone(),
+                                                    price,
+                                                }))?,
+                                            }).await?;
+
+                                            events_tx.send((job_key.clone(), DelegatorEvent::Delegated(identity)))?;
+                                            info!("Job {} delegated to best bidder: {}", hex::encode(&job_key), &identity);
+                                            Ok::<(), Error>(())
+                                        }).await;
+
+                                        match result {
+                                            Ok(_) => break,  // Break after successful delegation
+                                            Err(err) => error!(?err, "Failed to delegate job {}", hex::encode(&job_key)),
+                                        }
+                                    }
+                                }
+                            }
                         }
                         _ = shutdown_signal() => {
                             break
@@ -147,6 +166,7 @@ impl Drop for Delegator {
 
 #[derive(Debug, Clone)]
 pub enum DelegatorEvent {
+    Propagated,
     BidReceived(PeerId),
     Delegated(PeerId),
     Finished(Vec<u8>),

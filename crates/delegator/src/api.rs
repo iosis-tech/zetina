@@ -60,6 +60,7 @@ pub struct JobEventsRequest {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", content = "data")]
 pub enum JobEventsResponse {
+    Propagated,
     BidReceived(String),
     Delegated(String),
     Finished(Vec<u8>),
@@ -70,7 +71,7 @@ pub async fn job_events_handler(
     Query(input): Query<JobEventsRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, io::Error>>> {
     let stream = stream! {
-        let job_key =  kad::RecordKey::new(
+        let job_key = kad::RecordKey::new(
             &hex::decode(input.job_key)
             .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e.to_string()))?
         );
@@ -81,6 +82,7 @@ pub async fn job_events_handler(
                         yield Event::default()
                             .json_data(
                                 match event {
+                                    DelegatorEvent::Propagated => { JobEventsResponse::Propagated },
                                     DelegatorEvent::BidReceived(peer_id) => { JobEventsResponse::BidReceived(peer_id.to_base58()) },
                                     DelegatorEvent::Delegated(peer_id) => { JobEventsResponse::Delegated(peer_id.to_base58()) },
                                     DelegatorEvent::Finished(data) => { JobEventsResponse::Finished(data) },

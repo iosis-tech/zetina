@@ -25,7 +25,8 @@ import { WorkerMessage, WorkerResponse } from "@/utils/types";
 import { matchCommitment, matchLayout } from "@/utils/loadModule";
 
 const steps = [
-  "Job propagated to network",
+  "Job sent",
+  "Job propagated",
   "Job bidding",
   "Job delegated",
   "Proof received",
@@ -182,7 +183,7 @@ export default function Home() {
           const data: DelegateResponse = DelegateResponse.parse(
             await response.json(),
           );
-          addLog(`Job ${data.job_key} sent to the p2p network`);
+          addLog(`Job ${data.job_key} sent to delegator`);
           setActiveStep(1);
           setIsProcessing(data.job_key);
 
@@ -191,26 +192,32 @@ export default function Home() {
             `job_key=${data.job_key.toString()}`,
             async (event) => {
               let job_event = JobEventsResponse.parse(event);
+              if (job_event.type == "Propagated") {
+                addLog(
+                  `Job ${data.job_key} propagated to network DHT and gossip topics`,
+                );
+                setActiveStep(2);
+              }
               if (job_event.type == "BidReceived") {
                 let peer_id = PeerId.parse(job_event.data);
                 addLog(
                   `Recived bid for job ${data.job_key} from peer ${peer_id}`,
                 );
-                setActiveStep(2);
+                setActiveStep(3);
               }
               if (job_event.type == "Delegated") {
                 let peer_id = PeerId.parse(job_event.data);
                 addLog(`Job ${data.job_key} delegated to peer ${peer_id}`);
-                setActiveStep(3);
+                setActiveStep(4);
               }
               if (job_event.type == "Finished") {
                 let proof = Proof.parse(job_event.data);
                 addLog(`Job ${data.job_key} proof received`);
-                setActiveStep(4);
                 setDownloadBlob([
                   new Blob([new Uint8Array(proof)]),
                   `${data.job_key}_proof.json`,
                 ]);
+                setActiveStep(5);
                 setIsProcessing(null);
                 subscriber?.close();
                 await verifyProof(

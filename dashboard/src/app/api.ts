@@ -30,7 +30,8 @@ export const JobEventsResponse = z.object({
   type: z
     .literal("Finished")
     .or(z.literal("Delegated"))
-    .or(z.literal("BidReceived")),
+    .or(z.literal("BidReceived"))
+    .or(z.literal("Propagated")),
   data: z.any(),
 });
 export type JobEventsResponse = z.infer<typeof JobEventsResponse>;
