@@ -213,11 +213,11 @@ export default function Home() {
               if (job_event.type == "Finished") {
                 let proof = Proof.parse(job_event.data);
                 addLog(`Job ${data.job_key} proof received`);
-                setActiveStep(5);
                 setDownloadBlob([
                   new Blob([new Uint8Array(proof)]),
                   `${data.job_key}_proof.json`,
                 ]);
+                setActiveStep(5);
                 setIsProcessing(null);
                 subscriber?.close();
                 await verifyProof(
