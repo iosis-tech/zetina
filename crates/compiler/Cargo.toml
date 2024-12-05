@@ -24,3 +24,6 @@ tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+
+[features]
+full_test = []
